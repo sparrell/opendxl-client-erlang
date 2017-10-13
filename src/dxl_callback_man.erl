@@ -1,8 +1,8 @@
--module(callback_manager).
+-module(dxl_callback_man).
 
 -behaviour(gen_server).
 
--export([start_link/0 ]).
+-export([start_link/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -10,29 +10,32 @@
          handle_cast/2,
          handle_info/2,
          terminate/2,
-         code_change/3]).
+         code_change/3
+        ]).
+
+-include("dxl.hrl").
 
 -record(state, {
 	parent					:: pid,
         handlers = maps:new()			:: map()
       }).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Public Functions                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_link() ->
-    gen_server:start_link(?MODULE, [self()], []).
+%%%============================================================================
+%%% API functions
+%%%============================================================================
+start_link(GID) ->
+    Name = dlx_util:unique_registration_name(?MODULE, GID),
+    gen_server:start_link({local, Name}, ?MODULE, [self()], []).
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Private Functions                                                            %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%============================================================================
+%%% gen_server functions
+%%%============================================================================
 init([Parent]) ->
     process_flag(trap_exit, true),
     {ok, #state{parent=Parent}}.
 
-handle_call({add_callback, {Type, Topic}, Callback, Timeout}, _From, State) ->
-    {HandlerId, State1} = add_handler(Type, Topic, Callback, Timeout, State),
+handle_call({add_callback, Info}, _From, State) ->
+    {HandlerId, State1} = add_handler(Info, State),
     {reply, {ok, HandlerId}, State1};
 
 handle_call({remove_callback, IdOrPid}, _From, State) ->
@@ -42,8 +45,8 @@ handle_call({remove_callback, IdOrPid}, _From, State) ->
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
-handle_cast({notify, Payload, DxlClient}, State) ->
-    notify(Payload, DxlClient, State),
+handle_cast({notify, Topic, Message, DxlClient}, State) ->
+    notify(Topic, Message, DxlClient, State),
     {noreply, State};
 
 handle_cast(_Msg, State) ->
@@ -66,20 +69,22 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-%% Internal functions
+%%%============================================================================
+%%% Internal functions
+%%%============================================================================
+create_lookup_key(Type, Topic) when is_atom(Topic) ->
+    create_lookup_key(Type, atom_to_binary(Topic, utf8));
 
-create_lookup_key(Type, Topic) ->
+create_lookup_key(Type, Topic) when is_binary(Topic)->
     TypeBin = atom_to_binary(Type, utf8),
-    <<TypeBin/binary, Topic/binary>>.
+    Sep = <<":">>,
+    <<TypeBin/binary, Sep/binary, Topic/binary>>.
 
-create_handler_id() ->
-    make_ref().
-
-add_handler(Type, Topic, Callback, Timeout, State) ->
+add_handler(Info, State) ->
     #state{handlers=Handlers} = State,
+    #callback_info{type=Type, topic=Topic, callback=Callback} = Info,
     lager:debug("Adding message callback [~p] for type [~p] and topic [~p].", [Callback, Type, Topic]),
-    Id = create_handler_id(),
-    {ok, Pid} = callback_handler:start_link([Id, Callback, Timeout]),
+    {ok, {Id, Pid}} = dxl_callback:start_link(Info),
     Key = create_lookup_key(Type, Topic),
     lager:debug("Handler ID = ~p, Pid = ~p, Key=~p", [Id, Pid, Key]),
     List = maps:get(Key, Handlers, []),
@@ -111,23 +116,23 @@ remove_handlers([{Id, Pid, Key} | Rest], State) ->
     gen_server:cast(Pid, shutdown),
     remove_handlers(Rest, State#state{handlers=NewHandlers}).
 
-notify({Type, Topic, _Message} = Payload, DxlClient, State) ->
+notify(Topic, Message, DxlClient, State) ->
     #state{handlers=Handlers} = State,
+    #dxlmessage{type=Type} = Message,
     Key1 = create_lookup_key(Type, Topic),
     List1 = maps:get(Key1, Handlers, []),
-    Key2 = create_lookup_key(Type, <<"">>),
+    Key2 = create_lookup_key(Type, any),
     List2 = maps:get(Key2, Handlers, []),
-    Key3 = create_lookup_key(global, Topic),
+    Key3 = create_lookup_key(any, Topic),
     List3 = maps:get(Key3, Handlers, []),
-
     List = lists:append([List1,List2,List3]),
     lager:info("Callbacks: ~p", [List]),
-    notify_handlers(Payload, DxlClient, List).
+    notify_handlers(Topic, Message, DxlClient, List).
 
-notify_handlers(_Payload, _DxlClient, []) ->
+notify_handlers(_Topic, _Message, _DxlClient, []) ->
     ok;
 
-notify_handlers(Payload, DxlClient, [Info | Rest]) ->
+notify_handlers(Topic, Message, DxlClient, [Info | Rest]) ->
     Pid = element(2, Info),
-    gen_server:cast(Pid, {recv, Payload, DxlClient}),
-    notify_handlers(Payload, DxlClient, Rest).
+    gen_server:cast(Pid, {recv, Topic, Message, DxlClient}),
+    notify_handlers(Topic, Message, DxlClient, Rest).
