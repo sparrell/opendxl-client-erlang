@@ -34,7 +34,6 @@
 -define(SVC_UNREG_TOPIC,     <<"/mcafee/event/dxl/svcregistry/unregister">>).
 
 -record(dxlmessage, {
-	topic = <<"">>					:: binary(),
 	type = request					:: atom(),
         message_id = <<"">>                     	:: binary(),
         src_client_id = ?DEF_SRC_CLIENT_ID       	:: binary(),
@@ -65,12 +64,10 @@
        }).
 -type callback_info() :: #callback_info{}.
 
--record(svc_reg_info, {
+-record(service_registry, {
         service_type = <<"">>				:: binary(),
-	service_id = <<"">>				:: binary(),
 	metadata = maps:new()				:: map(),
-	topics = []					:: list(),
-	ttl=60						:: integer(),
-	dst_tenant_ids = []				:: list()
-       }).
--type svc_reg_info() :: #svc_reg_info{}.
+	topics = maps:new()				:: map(),
+        ttl=60						:: integer()
+      }).
+-type service_registry() :: #service_registry{}.

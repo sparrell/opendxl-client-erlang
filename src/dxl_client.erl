@@ -3,6 +3,7 @@
 -behaviour(gen_server).
 
 -export([start_link/1,
+	 connected/1,
 	 subscribe/2,
 	 sync_subscribe/2,
 	 unsubscribe/2,
@@ -29,18 +30,23 @@
 
 -record(state, {
 	gid						:: binary(),
+	connected = false				:: true | false,
 	opts = []					:: list(),
         mqttc,
 	client_id = ""					:: string(),
 	reply_to_topic = ""				:: string(),
-	notification_manager				:: pid()
+	notif_man					:: pid()
        }).
 
 %%%============================================================================
 %%% API Functions
 %%%============================================================================
 start_link([GID, MqttOpts]) ->
-    gen_server:start_link(?MODULE, [GID, MqttOpts], []).
+    Name = dxl_util:module_reg_name(GID, ?MODULE),
+    gen_server:start_link({local, Name}, ?MODULE, [GID, MqttOpts], []).
+
+connected(Pid) ->
+    gen_server:call(Pid, connected).
 
 subscribe(Pid, Topic) ->
     gen_server:call(Pid, {subscribe, Topic}).
@@ -82,18 +88,21 @@ send_event(Pid, Topic, Message) ->
 %%% gen_server functions
 %%%============================================================================
 init([GID, MqttOpts]) ->
-    dxl_registry:register_process({GID, ?MODULE}),
     ClientId = proplists:get_value(client_id, MqttOpts, dxl_util:generate_uuid()),
     ReplyToTopic = list_to_bitstring("/mcafee/client/" ++ ClientId),
-    {ok, NotifMgr} = dxl_registry:lookup_process({GID, dxl_notification_man}),
     {ok, Conn} = emqttc:start_link(MqttOpts),
+    emqttc:subscribe(Conn, ReplyToTopic),
     State = #state{gid=GID,
 		   opts=MqttOpts,
 		   mqttc=Conn,
 		   client_id=ClientId,
 		   reply_to_topic=ReplyToTopic,
-		   notification_manager=NotifMgr},
+		   notif_man=dxl_util:module_reg_name(GID, dxl_notif_man)},
     {ok, State}.
+
+handle_call(connected, _From, State) ->
+    #state{connected=Connected} = State,
+    {reply, Connected, State};
 
 handle_call({subscribe, Topic}, _From, State) ->
     #state{mqttc=C} = State,
@@ -115,12 +124,18 @@ handle_call(subscriptions, _From, State) ->
     [Topic || {Topic, _Qos} <- emqttc:topics(C)];
   
 handle_call({send_request, Topic, Message}, From, State) ->
-    #state{notification_manager=NotifMgr, reply_to_topic=ReplyToTopic} = State,
+    #state{notif_man=NotifMgr, reply_to_topic=ReplyToTopic} = State,
     Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
+    lager:debug("publishing message", []),
     {ok, MessageId} = publish(request, Topic, Message1, State),
-    Filter = dxl_notification_man:create_response_filter(MessageId),
-    Fun = fun({_,M,_}) -> gen_server:reply(From, M) end,
-    {ok, _} = dxl_notification_man:subscribe(NotifMgr, message_in, Fun, [{one_time_only, true}, {filter, Filter}]),
+    Filter = dxl_notif_man:create_response_filter(MessageId),
+    Fun = fun({_,M,_}) -> 
+	      io:format("~n~n~nGOT RESPONSE~n~n~n", []),
+              gen_server:reply(From, M)
+	  end,
+    lager:debug("registering notification", []),
+    {ok, _} = dxl_notif_man:subscribe(NotifMgr, message_in, Fun, [{one_time_only, true}, {filter, Filter}]),
+    lager:debug("returning.", []),
     {noreply, State};
 
 handle_call({send_async_request, Topic, Message}, _From, State) ->
@@ -149,21 +164,21 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({mqttc, C, connected}, #state{mqttc=C}=State) ->
-    #state{notification_manager=NotifManager} = State,
+    #state{notif_man=NotifManager} = State,
     lager:info("DXL Client ~p connected.", [C]),
-    dxl_notification_man:publish(NotifManager, connected, self()),
-    {noreply, State#state{mqttc=C}};
+    dxl_notif_man:publish(NotifManager, connected, self()),
+    {noreply, State#state{mqttc=C, connected=true}};
 
 handle_info({mqttc, C, disconnected}, #state{mqttc=C}=State) ->
-    #state{notification_manager=NotifManager} = State,
-    dxl_notification_man:publish(NotifManager, disconnected, self()),
+    #state{notif_man=NotifManager} = State,
+    dxl_notif_man:publish(NotifManager, disconnected, self()),
     lager:info("DXL Client ~p disconnected.", [C]),
-    {noreply, State};
+    {noreply, State#state{connected=false}};
 
 handle_info({publish, Topic, Binary}, State) ->
-    #state{notification_manager=NotifManager} = State,
+    #state{notif_man=NotifManager} = State,
     Message = dxl_decoder:decode(Binary),
-    dxl_notification_man:publish(NotifManager, message_in, {Topic, Message, self()}),
+    dxl_notif_man:publish(NotifManager, message_in, {Topic, Message, self()}),
     {noreply, State};
 
 handle_info(_Info, State) ->

@@ -1,4 +1,4 @@
--module(dxl_notification_man).
+-module(dxl_notif_man).
 -behaviour(gen_server).
 
 -export([create_topic_filter/1,
@@ -35,6 +35,7 @@
 	event					:: term(),
 	callback				:: term(),
 	filter = none				:: term(),
+	timer = make_ref()			:: reference(),
 	one_time_only = false			:: true | false
       }).
 
@@ -51,10 +52,11 @@ create_request_filter(Topic) ->
     create_topic_filter(request, Topic).
 
 create_response_filter(MessageIdIn) ->
-    fun({_, #dxlmessage{type=Type, request_message_id=MessageId}, _}) -> ((Type =:= response) and (MessageIdIn =:= MessageId)) end.
+    fun({_, #dxlmessage{type=Type, request_message_id=MessageId}, _}) -> (Type =:= response) and (MessageIdIn =:= MessageId) end.
 
 start_link(GID) ->
-    gen_server:start_link(?MODULE, [self(), GID], []).
+    Name = dxl_util:module_reg_name(GID, ?MODULE),
+    gen_server:start_link({local, Name}, ?MODULE, [self(), GID], []).
 
 subscribe(Pid, Event, Callback) ->
     gen_server:call(Pid, {subscribe, Event, Callback, []}).
@@ -74,7 +76,6 @@ publish(Pid, Event, Data) ->
 init([Parent, GID]) ->
     State = #state{parent=Parent, gid=GID},
     process_flag(trap_exit, true),
-    dxl_registry:register_process({GID, ?MODULE}),
     {ok, State}.
 
 handle_call({subscribe, Event, Callback, Opts}, _From, State) ->
@@ -91,6 +92,10 @@ handle_call({publish, Event, Data}, _From, State) ->
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+handle_info({notification_timeout, Id}, State) ->
+    {ok, State1} = do_unsubscribe(Id, State),
+    {noreply, State1};
 
 handle_info({'EXIT', Parent, Reason}, #state{parent=Parent}=State) ->
     {stop, {parent_exited, Reason}, State};
@@ -121,8 +126,8 @@ do_subscribe(Event, Callback, Opts, State) ->
     lager:info("Timeout == ~p", [Timeout]),
     Sub1 = case Timeout of
 	       I when is_integer(I) ->
-	           {ok, Pid} = dxl_timed_callback:start_link(Callback, Timeout),
-	 	   Sub#sub{callback=Pid};
+		   TimerRef = erlang:send_after(Timeout, self(), {notification_timeout, Id}),
+	 	   Sub#sub{timer=TimerRef};
 	       _ -> Sub
 	   end,
 		
@@ -155,13 +160,18 @@ do_publish(Event, Data, State) ->
     do_publish(Event, Data, List, State).
 
 do_publish(Event, Data, [Sub | Rest], State) ->
-    #sub{id=Id, callback=Callback, filter=Filter, one_time_only=Once} = Sub,
+    #sub{id=Id, callback=Callback, filter=Filter, timer=Timer, one_time_only=Once} = Sub,
+    erlang:cancel_timer(Timer),
     Self = self(),
+    lager:debug("Notif Candidate for ~p [~p]: ~p", [Event, Data, Sub]),
     F = fun() ->
             MatchesFilter = meets_filter_criteria(Filter, Data),
             case MatchesFilter of
-                false -> ok;
+                false -> 
+		    lager:debug("does not match filter", []),
+		    ok;
                 true -> 
+	  	    lager:debug("matches filter.", []),
 		    try
 	                execute_callback(Callback, Data)
 		    catch

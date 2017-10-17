@@ -2,7 +2,7 @@
 
 -export([message_type/1,
 	 generate_uuid/0,
-	 unique_registration_name/2
+	 module_reg_name/2
 	]).
 
 -include("dxl.hrl").
@@ -22,7 +22,9 @@ generate_uuid() ->
   Str = io_lib:format("~8.16.0b-~4.16.0b-4~3.16.0b-~4.16.0b-~12.16.0b", [A, B, C band 16#0fff, D band 16#3fff bor 16#8000, E]),
   list_to_binary(Str).
 
-unique_registration_name(Mod, UUID) when is_atom(Mod), is_binary(UUID) ->
+module_reg_name(UUID, Mod) when is_binary(UUID),
+				is_atom(Mod) ->
     Sep = <<"_">>,
     ModName = atom_to_binary(Mod, utf8),
     binary_to_atom(<<UUID/binary, Sep/binary, ModName/binary>>, utf8).
+
