@@ -5,22 +5,24 @@
 -export([start_link/1]).
 
 -export([register_service/2,
+	 register_service/3,
+	 register_service_async/2,
 	 unregister_service/2,
 	 update_service/3,
 	 subscribe/2,
 	 subscribe/3,
-	 sync_subscribe/2,
-	 sync_subscribe/3,
          unsubscribe/2,
   	 subscriptions/1,
 	 send_request/3,
 	 send_request/4,
-	 send_async_request/5,
+	 send_request_async/4,
+	 send_request_async/5,
 	 send_response/3,
 	 send_error/3,
 	 send_event/3,
 	 subscribe_notification/4,
-	 unsubscribe_notification/2
+	 unsubscribe_notification/2,
+	 is_connected/1
         ]).
 
 %% gen_server callbacks
@@ -41,7 +43,8 @@
 	subs = sets:new(),
 	pending_requests =  maps:new()			:: map(),
 	client_id = ""					:: string(),
-	reply_to_topic = ""				:: string()
+	reply_to_topic = ""				:: string(),
+	connected = false				:: true | false
        }).
 
 %%%============================================================================
@@ -50,8 +53,17 @@
 start_link([Opts]) ->
     gen_server:start_link(?MODULE, [Opts], []).
 
+is_connected(Pid) ->
+    gen_server:call(Pid, is_connected).
+
 register_service(Pid, Service) ->
-    gen_server:call(Pid, {register_service, Service}).
+    register_service(Pid, Service, ?DEF_SVC_REG_TIMEOUT).
+
+register_service(Pid, Service, Timeout) ->
+    gen_server:call(Pid, {register_service, Service, Timeout}, ?ADJUSTED_TIMEOUT(Timeout)).
+
+register_service_async(Pid, Service) ->
+    gen_server:call(Pid, {register_service_async, Service}).
 
 unregister_service(Pid, Id) ->
     gen_server:call(Pid, {unregister_service, Id}).
@@ -65,12 +77,6 @@ subscribe(Pid, Topic) ->
 subscribe(Pid, Topic, Callback) ->
     gen_server:call(Pid, {subscribe, Topic, Callback}).
 
-sync_subscribe(Pid, Topic) ->
-    sync_subscribe(Pid, Topic, none).
-
-sync_subscribe(Pid, Topic, Callback) ->
-    gen_server:call(Pid, {sync_subscribe, Topic, Callback}).
-
 unsubscribe(Pid, Topic) ->
     gen_server:call(Pid, {unsubscribe, Topic}).
 
@@ -81,16 +87,25 @@ send_request(Pid, Topic, Message) ->
     send_request(Pid, Topic, Message, ?DEF_REQ_TIMEOUT).
 
 send_request(Pid, Topic, Message, Timeout) ->
-    gen_server:call(Pid, {send_request, Topic, Message, Timeout}).
+    dxl_util:timed_call(Pid, {send_request, Topic, Message, Timeout}, ?ADJUSTED_TIMEOUT(Timeout)).
 
-send_async_request(Pid, Topic, Message, Callback, Timeout) ->
-    gen_server:call(Pid, {send_async_request, Topic, Message, Callback, Timeout}).
+send_request_async(Pid, Topic, Message, Callback) ->
+    send_request_async(Pid, Topic, Message, Callback, ?DEF_REQ_TIMEOUT).
 
-send_response(Pid, Topic, #dxlmessage{}=Message) ->
-    gen_server:call(Pid, {send_response, Topic, Message}).
+send_request_async(Pid, Topic, Message, Callback, Timeout) ->
+    gen_server:call(Pid, {send_request_async, Topic, Message, Callback, Timeout}).
 
-send_error(Pid, Topic, #dxlmessage{}=Message) ->
-    gen_server:call(Pid, {send_error, Topic, Message}).
+send_response(Pid, #dxlmessage{}=Request, #dxlmessage{}=Message) ->
+    gen_server:call(Pid, {send_response, Request, Message});
+
+send_response(Pid, #dxlmessage{}=Request, Message) when is_binary(Message) ->
+    gen_server:call(Pid, {send_response, Request, #dxlmessage{payload=Message}}).
+
+send_error(Pid, #dxlmessage{}=Request, #dxlmessage{}=Message) ->
+    gen_server:call(Pid, {send_error, Request, Message});
+
+send_error(Pid, #dxlmessage{}=Request, Message) when is_binary(Message) ->
+    gen_server:call(Pid, {send_error, Request, #dxlmessage{payload=Message}}).
 
 send_event(Pid, Topic, #dxlmessage{}=Message) ->
     gen_server:call(Pid, {send_event, Topic, Message}).
@@ -115,6 +130,11 @@ init([MqttOpts]) ->
 		service_man=ServiceMan}}.
 
 %%% DXL Client functions
+handle_call(is_connected, _From, State) ->
+    #state{dxl_client=C} = State,
+    Response = dxl_client:is_connected(C),
+    {reply, Response, State};
+
 handle_call({subscribe, Topic, Callback}, _From, State) ->
     #state{dxl_client=C, notif_man=N} = State,
     ok = dxl_client:subscribe(C, Topic),
@@ -126,17 +146,6 @@ handle_call({subscribe, Topic, Callback}, _From, State) ->
             {reply, {ok, Id}, State}
     end;
     
-handle_call({sync_subscribe, Topic, Callback}, _From, State) ->
-    #state{dxl_client=C, notif_man=N} = State,
-    ok = dxl_client:subscribe(C, Topic),
-    case Callback of
-        none -> {reply, ok, State};
-	_ ->
-            Filter = dxl_notif_man:create_topic_filter(Topic),
-	    {ok, Id} = dxl_notif_man:subscribe(N, message_in, Callback, [{filter,Filter}]),
-            {reply, {ok, Id}, State}
-    end;
-
 handle_call({unsubscribe, Topic}, _From, State) ->
     #state{dxl_client=C} = State,
     ok = dxl_client:unsubscribe(C, Topic),
@@ -152,14 +161,19 @@ handle_call({send_request, Topic, Message, Timeout}, _From, State) ->
     Result = dxl_client:send_request(C, Topic, Message, Timeout),
     {reply, Result, State};
 
-handle_call({send_response, Topic, Message}, _From, State) ->
+handle_call({send_request_async, Topic, Message, Callback, Timeout}, _From, State) ->
     #state{dxl_client=C} = State,
-    Result = dxl_client:send_response(C, Topic, Message),
+    Result = dxl_client:send_request_async(C, Topic, Message, Callback, Timeout),
     {reply, Result, State};
 
-handle_call({send_error, Topic, Message}, _From, State) ->
+handle_call({send_response, Request, Message}, _From, State) ->
     #state{dxl_client=C} = State,
-    Result = dxl_client:send_error(C, Topic, Message),
+    Result = dxl_client:send_response(C, Request, Message),
+    {reply, Result, State};
+
+handle_call({send_error, Request, Message}, _From, State) ->
+    #state{dxl_client=C} = State,
+    Result = dxl_client:send_error(C, Request, Message),
     {reply, Result, State};
 
 handle_call({send_event, Topic, Message}, _From, State) ->
@@ -179,9 +193,14 @@ handle_call({unsubscribe_notification, Id}, _From, State) ->
     {reply, Result, State};
     
 %%% Service functions
-handle_call({register_service, Service}, _From, State) ->
+handle_call({register_service, Service, Timeout}, _From, State) ->
     #state{service_man=ServiceMan} = State,
-    Result = dxl_service_man:register_service(ServiceMan, Service),
+    Result = dxl_service_man:register_service(ServiceMan, Service, Timeout),
+    {reply, Result, State};
+
+handle_call({register_service_async, Service}, _From, State) ->
+    #state{service_man=ServiceMan} = State,
+    Result = dxl_service_man:register_service_async(ServiceMan, Service),
     {reply, Result, State};
 
 handle_call({unregister_service, Id}, _From, State) ->
@@ -201,6 +220,12 @@ handle_call(Request, _From, State) ->
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+handle_info({connected, _Client}, State) ->
+    {noreply, State#state{connected=true}};
+
+handle_info({disconnected, _Client}, State) ->
+    {noreply, State#state{connected=false}};
 
 handle_info(_Info, State) ->
     {noreply, State}.

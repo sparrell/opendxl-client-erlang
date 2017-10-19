@@ -41,9 +41,10 @@ encode(0=_Version, response, Message, Binary) ->
     <<Binary/binary, ReqMessageId/binary, ServiceId/binary>>;
 
 encode(0=_Version, error, Message, Binary) ->
+    Binary1 = encode(0, response, Message, Binary),
     ErrorCode = pack(Message#dxlmessage.error_code),
     ErrorMsg = pack(Message#dxlmessage.error_message),
-    <<Binary/binary, ErrorCode/binary, ErrorMsg/binary>>;
+    <<Binary1/binary, ErrorCode/binary, ErrorMsg/binary>>;
 
 encode(1=_Version, Type, Message, Binary0) ->
     Binary1 = encode(0, Type, Message, Binary0),

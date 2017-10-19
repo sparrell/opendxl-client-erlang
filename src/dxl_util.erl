@@ -2,7 +2,13 @@
 
 -export([message_type/1,
 	 generate_uuid/0,
-	 module_reg_name/2
+	 module_reg_name/2,
+	 parse_ini/1,
+  	 timed_call/3,
+	 log_dxlmessage/2,
+	 print_dxlmessage/2,
+	 message_is_a_reply/1,
+	 message_is_a_reply/2
 	]).
 
 -include("dxl.hrl").
@@ -27,4 +33,46 @@ module_reg_name(UUID, Mod) when is_binary(UUID),
     Sep = <<"_">>,
     ModName = atom_to_binary(Mod, utf8),
     binary_to_atom(<<UUID/binary, Sep/binary, ModName/binary>>, utf8).
+
+parse_ini(Filename) ->
+    case file:read_file(Filename) of
+        {ok, Contents} ->
+            eini:parse(Contents); 
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+
+timed_call(Pid, Msg, Timeout) ->
+    try
+        gen_server:call(Pid, Msg, Timeout)
+    catch
+        exit:{timeout,_} -> {error, timeout}
+    end.
+
+log_dxlmessage(Prefix, Message) ->
+    Output = io_lib_pretty:print(Message, fun(dxlmessage, 15) -> record_info(fields, dxlmessage) end),
+    lager:debug("~s: ~s", [Prefix, Output]),
+    ok.
+    
+print_dxlmessage(Prefix, Message) ->
+    Output = io_lib_pretty:print(Message, fun(dxlmessage, 15) -> record_info(fields, dxlmessage) end),
+    io:format("~s: ~s~n", [Prefix, Output]),
+    ok.
+
+message_is_a_reply(#dxlmessage{}=Message) ->
+    #dxlmessage{type=Type} = Message,
+    case Type of
+        error -> true;
+	response -> true;
+	_ -> false
+    end.
+
+message_is_a_reply(#dxlmessage{}=Message, #dxlmessage{}=Request) ->
+    #dxlmessage{request_message_id=ReqMessageId} = Message,
+    #dxlmessage{message_id=MessageId} = Request,
+    case {ReqMessageId, MessageId} of
+        {X, X} -> message_is_a_reply(Message);
+	_ -> false
+    end.
 

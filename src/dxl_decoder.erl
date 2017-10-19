@@ -40,10 +40,11 @@ decode(0=_Version, response, Message0, Binary) ->
     {Message1, Rest1};
 
 decode(0=_Version, error, Message0, Binary) ->
-    {ErrCode, Rest0} = unpack(Binary),
-    {ErrMsg, Rest1} = unpack(Rest0),
-    Message1 = Message0#dxlmessage{error_code=ErrCode, error_message=ErrMsg},
-    {Message1, Rest1};
+    {Message1, Rest0} = decode(0, response, Message0, Binary),
+    {ErrCode, Rest1} = unpack(Rest0),
+    {ErrMsg, Rest2} = unpack(Rest1),
+    Message2 = Message1#dxlmessage{error_code=ErrCode, error_message=ErrMsg},
+    {Message2, Rest2};
  
 decode(0=_Version, _Type, Message0, Binary) ->
     {Message0, Binary};
@@ -63,4 +64,4 @@ decode(2=_Version, Type, Message0, Binary) ->
 
 
 unpack(Binary) ->
-    msgpack:unpack_stream(Binary, [{unpack_str, as_binary}]).
+    msgpack:unpack_stream(Binary, [{unpack_str, as_binary}, {spec, old}]).

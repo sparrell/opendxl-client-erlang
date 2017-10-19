@@ -29,9 +29,12 @@
 
 -define(SVC_REG_REQ_TOPIC,   <<"/mcafee/service/dxl/svcregistry/register">>).
 -define(SVC_REG_TOPIC,       <<"/mcafee/event/dxl/svcregistry/register">>).
+-define(DEF_SVC_REG_TIMEOUT, (60 * 2 * 1000)).
 
 -define(SVC_UNREG_REQ_TOPIC, <<"/mcafee/service/dxl/svcregistry/unregister">>).
 -define(SVC_UNREG_TOPIC,     <<"/mcafee/event/dxl/svcregistry/unregister">>).
+
+-define(ADJUSTED_TIMEOUT(Timeout), (Timeout + 50)).
 
 -record(dxlmessage, {
 	type = request					:: atom(),

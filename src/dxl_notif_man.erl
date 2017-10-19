@@ -31,6 +31,7 @@
       }).
 
 -record(sub, {
+	owner					:: pid(),
         id					:: reference(),
 	event					:: term(),
 	callback				:: term(),
@@ -42,27 +43,31 @@
 %%%============================================================================
 %%% API functions
 %%%============================================================================
-create_topic_filter(TopicIn) ->
-    fun({Topic, _, _}) -> TopicIn =:= Topic end.
+create_topic_filter(Topic) ->
+    fun({T, _, _}) -> Topic =:= T end.
 
 create_topic_filter(TypeIn, TopicIn) ->
-    fun({Topic, #dxlmessage{type=Type}, _}) -> ((TypeIn =:= Type) and (TopicIn =:= Topic)) end.
+    fun({Topic, #dxlmessage{type=Type}, _}) when Type =:= TypeIn, Topic =:= TopicIn -> true;
+       ({_, _, _}) -> false
+    end.
 
 create_request_filter(Topic) ->
     create_topic_filter(request, Topic).
 
-create_response_filter(MessageIdIn) ->
-    fun({_, #dxlmessage{type=Type, request_message_id=MessageId}, _}) -> (Type =:= response) and (MessageIdIn =:= MessageId) end.
+create_response_filter(#dxlmessage{}=Request) ->
+    fun({_, #dxlmessage{}=Message, _}) -> dxl_util:message_is_a_reply(Message, Request);
+       ({_, _, _}) -> false
+    end.
 
 start_link(GID) ->
     Name = dxl_util:module_reg_name(GID, ?MODULE),
     gen_server:start_link({local, Name}, ?MODULE, [self(), GID], []).
 
 subscribe(Pid, Event, Callback) ->
-    gen_server:call(Pid, {subscribe, Event, Callback, []}).
+    gen_server:call(Pid, {subscribe, Event, Callback, [], self()}).
 
 subscribe(Pid, Event, Callback, Opts) ->
-    gen_server:call(Pid, {subscribe, Event, Callback, Opts}).
+    gen_server:call(Pid, {subscribe, Event, Callback, Opts, self()}).
 
 unsubscribe(Pid, Id) ->
     gen_server:call(Pid, {unsubscribe, Id}).
@@ -78,8 +83,8 @@ init([Parent, GID]) ->
     process_flag(trap_exit, true),
     {ok, State}.
 
-handle_call({subscribe, Event, Callback, Opts}, _From, State) ->
-    {ok, Id, State1} = do_subscribe(Event, Callback, Opts, State),
+handle_call({subscribe, Event, Callback, Opts, Owner}, _From, State) ->
+    {ok, Id, State1} = do_subscribe(Event, Callback, Opts, Owner, State),
     {reply, {ok, Id}, State1};
 
 handle_call({unsubscribe, Id}, _From, State) ->
@@ -116,14 +121,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%%============================================================================
 %%% Internal functions
 %%%============================================================================
-do_subscribe(Event, Callback, Opts, State) ->
+do_subscribe(Event, Callback, Opts, Owner, State) ->
     #state{subscriptions=Subscriptions} = State,
     Filter = proplists:get_value(filter, Opts, none),
     OneTimeOnly = proplists:get_value(one_time_only, Opts, false),
     Timeout = proplists:get_value(timeout, Opts, infinity),
     Id = make_ref(),
     Sub = #sub{id=Id, event=Event, callback=Callback, filter=Filter, one_time_only=OneTimeOnly},
-    lager:info("Timeout == ~p", [Timeout]),
     Sub1 = case Timeout of
 	       I when is_integer(I) ->
 		   TimerRef = erlang:send_after(Timeout, self(), {notification_timeout, Id}),
@@ -132,6 +136,7 @@ do_subscribe(Event, Callback, Opts, State) ->
 	   end,
 		
     NewSubs =  maps:put(Event, [Sub1 | maps:get(Event, Subscriptions, [])], Subscriptions),
+    erlang:monitor(process, Owner),
     {ok, Id, State#state{subscriptions=NewSubs}}.
 
 do_unsubscribe(Id, State) when is_reference(Id) ->
@@ -141,7 +146,8 @@ do_unsubscribe(Id, State) when is_reference(Id) ->
 
 do_unsubscribe(Pid, State) when is_pid(Pid) ->
     #state{subscriptions=Subscriptions} = State,
-    Matches = lists:filter(fun(#sub{callback=Callback}) -> Pid =:= Callback end, lists:flatten(maps:values(Subscriptions))),
+    Fun = fun(#sub{callback=Callback, owner=Owner}) -> (Pid =:= Callback) or (Pid =:= Owner) end,
+    Matches = lists:filter(Fun, lists:flatten(maps:values(Subscriptions))),
     do_unsubscribe(Matches, State);
 
 do_unsubscribe([#sub{id=Id,event=Event} | Rest], State) ->
@@ -163,17 +169,14 @@ do_publish(Event, Data, [Sub | Rest], State) ->
     #sub{id=Id, callback=Callback, filter=Filter, timer=Timer, one_time_only=Once} = Sub,
     erlang:cancel_timer(Timer),
     Self = self(),
-    lager:debug("Notif Candidate for ~p [~p]: ~p", [Event, Data, Sub]),
     F = fun() ->
             MatchesFilter = meets_filter_criteria(Filter, Data),
             case MatchesFilter of
                 false -> 
-		    lager:debug("does not match filter", []),
 		    ok;
                 true -> 
-	  	    lager:debug("matches filter.", []),
 		    try
-	                execute_callback(Callback, Data)
+			dxl_callback:execute(Callback, Data)
 		    catch
 		        _ -> unsubscribe(Self, Id)
 		    end,
@@ -197,13 +200,4 @@ meets_filter_criteria(Func, Data) when is_function(Func, 1) ->
 
 meets_filter_criteria(_Func, _Data) ->
     true.
-
-execute_callback({M,F,A}, Data) ->
-    erlang:apply(M, F, [Data | A]);
-
-execute_callback(Callback, Data) when is_function(Callback, 1) ->
-    Callback(Data);
-
-execute_callback(Pid, Data) when is_pid(Pid) ->
-    Pid ! {notification, Data}.
 

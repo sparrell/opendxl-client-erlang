@@ -3,15 +3,15 @@
 -behaviour(gen_server).
 
 -export([start_link/1,
-	 connected/1,
+	 is_connected/1,
 	 subscribe/2,
-	 sync_subscribe/2,
 	 unsubscribe/2,
 	 subscriptions/1,
 	 send_request/3,
 	 send_request/4,
-	 send_async_request/4,
-	 send_async_request/5,
+	 send_request_async/3,
+	 send_request_async/4,
+	 send_request_async/5,
 	 send_response/3,
 	 send_error/3,
 	 send_event/3
@@ -45,14 +45,11 @@ start_link([GID, MqttOpts]) ->
     Name = dxl_util:module_reg_name(GID, ?MODULE),
     gen_server:start_link({local, Name}, ?MODULE, [GID, MqttOpts], []).
 
-connected(Pid) ->
-    gen_server:call(Pid, connected).
+is_connected(Pid) ->
+    gen_server:call(Pid, is_connected).
 
 subscribe(Pid, Topic) ->
     gen_server:call(Pid, {subscribe, Topic}).
-
-sync_subscribe(Pid, Topic) ->
-    gen_server:call(Pid, {sync_subscribe, Topic}).
 
 unsubscribe(Pid, Topic) ->
     gen_server:call(Pid, {unsubscribe, Topic}).
@@ -64,23 +61,22 @@ send_request(Pid, Topic, Message) ->
     send_request(Pid, Topic, Message, ?DEF_REQ_TIMEOUT).
 
 send_request(Pid, Topic, Message, Timeout) ->
-    try
-        gen_server:call(Pid, {send_request, Topic, Message}, Timeout)
-    catch
-        exit:{timeout,_} -> {error, timeout}
-    end.
+    dxl_util:timed_call(Pid, {send_request, Topic, Message}, Timeout).
 
-send_async_request(Pid, Topic, Message, Callback) ->
-    send_async_request(Pid, Topic, Message, Callback, ?DEF_REQ_TIMEOUT).
+send_request_async(Pid, Topic, Message) ->
+    gen_server:call(Pid, {send_request_async, Topic, Message}).
 
-send_async_request(Pid, Topic, Message, Callback, Timeout) ->
-    gen_server:call(Pid, {send_async_request, Topic, Message, Callback, Timeout}).
+send_request_async(Pid, Topic, Message, Callback) ->
+    send_request_async(Pid, Topic, Message, Callback, ?DEF_REQ_TIMEOUT).
 
-send_response(Pid, Topic, Message) ->
-    gen_server:call(Pid, {send_response, Topic, Message}).
+send_request_async(Pid, Topic, Message, Callback, Timeout) ->
+    gen_server:call(Pid, {send_request_async, Topic, Message, Callback, Timeout}).
 
-send_error(Pid, Topic, Message) ->
-    gen_server:call(Pid, {send_error, Topic, Message}).
+send_response(Pid, Request, Message) ->
+    gen_server:call(Pid, {send_response, Request, Message}).
+
+send_error(Pid, Request, Message) ->
+    gen_server:call(Pid, {send_error, Request, Message}).
 
 send_event(Pid, Topic, Message) ->
     gen_server:call(Pid, {send_event, Topic, Message}).
@@ -100,18 +96,15 @@ init([GID, MqttOpts]) ->
 		   notif_man=dxl_util:module_reg_name(GID, dxl_notif_man)},
     {ok, State}.
 
-handle_call(connected, _From, State) ->
-    #state{connected=Connected} = State,
-    {reply, Connected, State};
+handle_call(is_connected, _From, State) ->
+    #state{mqttc=C} = State,
+    R = emqttc:is_connected(C),
+    {reply, R, State};
+    %%{reply, Connected, State};
 
 handle_call({subscribe, Topic}, _From, State) ->
     #state{mqttc=C} = State,
     ok = emqttc:subscribe(C, Topic),
-    {reply, ok, State};
-
-handle_call({sync_subscribe, Topic}, _From, State) ->
-    #state{mqttc=C} = State,
-    {ok, _Qos} = emqttc:sync_subscribe(C, Topic),
     {reply, ok, State};
 
 handle_call({unsubscribe, Topic}, _From, State) ->
@@ -126,30 +119,37 @@ handle_call(subscriptions, _From, State) ->
 handle_call({send_request, Topic, Message}, From, State) ->
     #state{notif_man=NotifMgr, reply_to_topic=ReplyToTopic} = State,
     Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
-    lager:debug("publishing message", []),
     {ok, MessageId} = publish(request, Topic, Message1, State),
-    Filter = dxl_notif_man:create_response_filter(MessageId),
-    Fun = fun({_,M,_}) -> 
-	      io:format("~n~n~nGOT RESPONSE~n~n~n", []),
-              gen_server:reply(From, M)
-	  end,
-    lager:debug("registering notification", []),
+    Filter = dxl_notif_man:create_response_filter(Message1#dxlmessage{message_id=MessageId}),
+    Fun = fun({_,M,_}) -> gen_server:reply(From, M) end,
     {ok, _} = dxl_notif_man:subscribe(NotifMgr, message_in, Fun, [{one_time_only, true}, {filter, Filter}]),
-    lager:debug("returning.", []),
     {noreply, State};
 
-handle_call({send_async_request, Topic, Message}, _From, State) ->
+handle_call({send_request_async, Topic, Message}, _From, State) ->
     #state{reply_to_topic=ReplyToTopic} = State,
     Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
-    Result = publish(request, Topic, Message1, State),
+    {ok, _MessageId} = publish(request, Topic, Message1, State),
+    {reply, ok, State};
+
+handle_call({send_request_async, Topic, Message, Callback, Timeout}, _From, State) ->
+    #state{reply_to_topic=ReplyToTopic, notif_man=NotifMan} = State,
+    Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
+    {ok, MessageId} = publish(request, Topic, Message1, State),
+    Filter = dxl_notif_man:create_response_filter(Message1#dxlmessage{message_id=MessageId}),
+    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
+    {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
+    {reply, {ok, NotifId}, State};
+
+handle_call({send_response, Request, Message}, _From, State) ->
+    #dxlmessage{reply_to_topic=ReplyToTopic} = Request,
+    Message1 = populate_response_from_request(Request, Message),
+    Result = publish(response, ReplyToTopic, Message1, State),
     {reply, Result, State};
 
-handle_call({send_response, Topic, Message}, _From, State) ->
-    Result = publish(response, Topic, Message, State),
-    {reply, Result, State};
-
-handle_call({send_error, Topic, Message}, _From, State) ->
-    Result = publish(error, Topic, Message, State),
+handle_call({send_error, Request, Message}, _From, State) ->
+    #dxlmessage{reply_to_topic=ReplyToTopic} = Request,
+    Message1 = populate_response_from_request(Request, Message),
+    Result = publish(error, ReplyToTopic, Message1, State),
     {reply, Result, State};
 
 handle_call({send_event, Topic, Message}, _From, State) ->
@@ -166,18 +166,19 @@ handle_cast(_Msg, State) ->
 handle_info({mqttc, C, connected}, #state{mqttc=C}=State) ->
     #state{notif_man=NotifManager} = State,
     lager:info("DXL Client ~p connected.", [C]),
-    dxl_notif_man:publish(NotifManager, connected, self()),
+    dxl_notif_man:publish(NotifManager, connected, {connected, self()}),
     {noreply, State#state{mqttc=C, connected=true}};
 
 handle_info({mqttc, C, disconnected}, #state{mqttc=C}=State) ->
     #state{notif_man=NotifManager} = State,
-    dxl_notif_man:publish(NotifManager, disconnected, self()),
+    dxl_notif_man:publish(NotifManager, disconnected, {disconnected, self()}),
     lager:info("DXL Client ~p disconnected.", [C]),
     {noreply, State#state{connected=false}};
 
 handle_info({publish, Topic, Binary}, State) ->
     #state{notif_man=NotifManager} = State,
     Message = dxl_decoder:decode(Binary),
+    dxl_util:log_dxlmessage("Message In", Message),
     dxl_notif_man:publish(NotifManager, message_in, {Topic, Message, self()}),
     {noreply, State};
 
@@ -193,10 +194,15 @@ code_change(_OldVsn, State, _Extra) ->
 %%%============================================================================
 %%% Internal functions
 %%%============================================================================
+populate_response_from_request(Request, Response) ->
+    #dxlmessage{message_id=RequestMessageId, service_id=ServiceId} = Request,
+    Response#dxlmessage{request_message_id=RequestMessageId, service_id=ServiceId}.
+    
 publish(Type, Topic, Message, State) ->
     #state{mqttc=C, client_id=ClientId} = State,
     MessageId = dxl_util:generate_uuid(),
     Message1 = Message#dxlmessage{type=Type, message_id=MessageId, src_client_id=ClientId},
+    dxl_util:log_dxlmessage("Publishing: ", Message1),
     Encoded = dxl_encoder:encode(Message1),
     %% {ok, MsgId} or {error, timeout}
     ok = emqttc:publish(C, Topic, Encoded),
