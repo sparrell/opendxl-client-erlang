@@ -5,9 +5,9 @@
 %% API
 -export([start_link/1,
 	 register_service/3,
-	 register_service_async/2,
-	 unregister_service/2,
-	 update_service/3
+	 register_service_async/3,
+	 unregister_service/3,
+	 update_service/4
 	]).
 
 %% gen_server callbacks
@@ -37,16 +37,16 @@ start_link(GID) ->
     gen_server:start_link({local, Name}, ?MODULE, [self(), GID], []).
 
 register_service(Pid, #service_registry{}=Service, Timeout) ->
-    gen_server:call(Pid, {register, Service, Timeout}, ?ADJUSTED_TIMEOUT(Timeout)).
+    dxl_util:safe_gen_server_call(Pid, {register, Service, Timeout}, Timeout).
 
-register_service_async(Pid, #service_registry{}=Service) ->
-    gen_server:call(Pid, {register_async, Service}).
+register_service_async(Pid, #service_registry{}=Service, Timeout) ->
+    dxl_util:safe_gen_server_call(Pid, {register_async, Service, Timeout}, Timeout).
 
-unregister_service(Pid, Id) ->
-    gen_server:call(Pid, {unregister, Id}).
+unregister_service(Pid, Id, Timeout) ->
+    dxl_util:safe_gen_server_call(Pid, {unregister, Id}, Timeout).
 
-update_service(Pid, Id, #service_registry{} = Service) ->
-    gen_server:call(Pid, {update, Id, Service}).
+update_service(Pid, Id, #service_registry{} = Service, Timeout) ->
+    dxl_util:safe_gen_server_call(Pid, {update, Id, Service}, Timeout).
 
 %%%============================================================================
 %%% gen_server functions
@@ -62,12 +62,18 @@ handle_call({register, Service, Timeout}, From, State) ->
     {Id, State1} = do_register_service(Service, State),
     Filter = fun({_, ServiceId, _}) -> ServiceId =:= Id end,
     Fun = fun({_, ServiceId, _}) -> gen_server:reply(From, {ok, ServiceId}) end,
-    Opts = [{filter, Filter}, {timeout, Timeout}, {one_time_only, true}],
+    TimeoutFun = fun(_) ->  dxl_service_man:unregister_service(self(), Id, ?DEF_SVC_REG_TIMEOUT) end,
+    Opts = [{filter, Filter}, {timeout, {Timeout, TimeoutFun}}, {one_time_only, true}],
     dxl_notif_man:subscribe(NotifMan, service_registered, Fun, Opts),
     {noreply, State1, Timeout};
 
-handle_call({register_async, Service}, _From, State) ->
+handle_call({register_async, Service, Timeout}, _From, State) ->
+    #state{notif_man=NotifMan} = State,
     {Id, State1} = do_register_service(Service, State),
+    Filter = fun({_, ServiceId, _}) -> ServiceId =:= Id end,
+    TimeoutFun = fun(_) ->  dxl_service_man:unregister_service(self(), Id, ?DEF_SVC_REG_TIMEOUT) end,
+    Opts = [{filter, Filter}, {timeout, {Timeout, TimeoutFun}}, {one_time_only, true}],
+    dxl_notif_man:subscribe(NotifMan, service_registered, undefined, Opts),
     {reply, {ok, Id} , State1};
 
 handle_call({unregister, Id}, _From, State) ->

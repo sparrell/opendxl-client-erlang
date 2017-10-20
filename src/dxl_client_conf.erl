@@ -21,17 +21,17 @@ read_from_file(Filename) ->
             ReconnDelayMax = binary_to_integer(get_value('General', 'ReconnectDelayMax', Config, <<"30">>)),
             LogLevel = binary_to_atom(get_value('General', 'LogLevel', Config, <<"info">>), utf8),
 
-            [{client_id, ClientId},
-             {hosts, Hosts},
-             {keepalive, KeepAlive},
-             {ssl, [
-               {cacertfile, BrokerCertChain},
-               {certfile, CertFile},
-               {keyfile, PrivateKey}
-             ]},
-             {reconnect, {ReconnDelayMin, ReconnDelayMax, ConnectRetries}},
-             {logger, {lager, LogLevel}},
-             auto_resub];
+	    {ok, [{client_id, ClientId},
+             	  {hosts, Hosts},
+             	  {keepalive, KeepAlive},
+             	  {ssl, [
+                    {cacertfile, BrokerCertChain},
+                    {certfile, CertFile},
+                    {keyfile, PrivateKey}
+                  ]},
+                  {reconnect, {ReconnDelayMin, ReconnDelayMax, ConnectRetries}},
+                  {logger, {lager, LogLevel}},
+                  auto_resub]};
         Error ->
             Error
     end.

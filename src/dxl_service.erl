@@ -180,14 +180,13 @@ send_register(State) ->
     lager:debug("Sending DXL service registration: ~p (~p).", [Type, Id]),
     Payload = build_registration_payload(State),
     Request = #dxlmessage{payload=Payload, dst_tenant_ids=State#state.dst_tenant_ids},
-    Filter = dxl_notif_man:create_response_filter(Request),
     Self = self(),
     Fun = fun({_, #dxlmessage{type=response}, _}) -> 
 	         gen_server:cast(Self, registration_success);
     	     ({_, #dxlmessage{type=error, error_code=ErrCode, error_message=ErrMsg}, _}) -> 
 	         gen_server:cast(Self, {registration_failed, {ErrCode, ErrMsg}})
 	  end,
-    dxl_client:send_request_async(DxlClient, ?SVC_REG_REQ_TOPIC, Request, Fun, [{filter, Filter}]),
+    dxl_client:send_request_async(DxlClient, ?SVC_REG_REQ_TOPIC, Request, Fun, infinity),
     ok.
 
 send_subscribe(State) ->

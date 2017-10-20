@@ -43,7 +43,8 @@ decode(0=_Version, error, Message0, Binary) ->
     {Message1, Rest0} = decode(0, response, Message0, Binary),
     {ErrCode, Rest1} = unpack(Rest0),
     {ErrMsg, Rest2} = unpack(Rest1),
-    Message2 = Message1#dxlmessage{error_code=ErrCode, error_message=ErrMsg},
+    ErrCode2 = <<ErrCode/unsigned>>,
+    Message2 = Message1#dxlmessage{error_code=ErrCode2, error_message=ErrMsg},
     {Message2, Rest2};
  
 decode(0=_Version, _Type, Message0, Binary) ->

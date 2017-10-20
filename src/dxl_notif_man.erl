@@ -102,6 +102,11 @@ handle_info({notification_timeout, Id}, State) ->
     {ok, State1} = do_unsubscribe(Id, State),
     {noreply, State1};
 
+handle_info({notification_timeout, Id, Callback}, State) ->
+    {ok, State1} = do_unsubscribe(Id, State),
+    dxl_callback:execute(Callback, {notification_timeout, Id}),
+    {noreply, State1};
+
 handle_info({'EXIT', Parent, Reason}, #state{parent=Parent}=State) ->
     {stop, {parent_exited, Reason}, State};
 
@@ -129,6 +134,9 @@ do_subscribe(Event, Callback, Opts, Owner, State) ->
     Id = make_ref(),
     Sub = #sub{id=Id, event=Event, callback=Callback, filter=Filter, one_time_only=OneTimeOnly},
     Sub1 = case Timeout of
+	       {I, Cb} when is_integer(I) ->
+		   TimerRef = erlang:send_after(I, self(), {notification_timeout, Id, Cb}),
+	 	   Sub#sub{timer=TimerRef};
 	       I when is_integer(I) ->
 		   TimerRef = erlang:send_after(Timeout, self(), {notification_timeout, Id}),
 	 	   Sub#sub{timer=TimerRef};

@@ -4,7 +4,7 @@
 	 generate_uuid/0,
 	 module_reg_name/2,
 	 parse_ini/1,
-  	 timed_call/3,
+  	 safe_gen_server_call/3,
 	 log_dxlmessage/2,
 	 print_dxlmessage/2,
 	 message_is_a_reply/1,
@@ -43,7 +43,7 @@ parse_ini(Filename) ->
     end.
 
 
-timed_call(Pid, Msg, Timeout) ->
+safe_gen_server_call(Pid, Msg, Timeout) ->
     try
         gen_server:call(Pid, Msg, Timeout)
     catch
