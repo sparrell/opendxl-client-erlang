@@ -1,11 +1,7 @@
 -module(dxl_notif_man).
 -behaviour(gen_server).
 
--export([create_topic_filter/1,
-	 create_topic_filter/2,
-	 create_request_filter/1,
-	 create_response_filter/1,
-	 start_link/1,
+-export([start_link/1,
 	 subscribe/3,
 	 subscribe/4,
 	 unsubscribe/2,
@@ -43,22 +39,6 @@
 %%%============================================================================
 %%% API functions
 %%%============================================================================
-create_topic_filter(Topic) ->
-    fun({T, _, _}) -> Topic =:= T end.
-
-create_topic_filter(TypeIn, TopicIn) ->
-    fun({Topic, #dxlmessage{type=Type}, _}) when Type =:= TypeIn, Topic =:= TopicIn -> true;
-       ({_, _, _}) -> false
-    end.
-
-create_request_filter(Topic) ->
-    create_topic_filter(request, Topic).
-
-create_response_filter(#dxlmessage{}=Request) ->
-    fun({_, #dxlmessage{}=Message, _}) -> dxl_util:message_is_a_reply(Message, Request);
-       ({_, _, _}) -> false
-    end.
-
 start_link(GID) ->
     Name = dxl_util:module_reg_name(GID, ?MODULE),
     gen_server:start_link({local, Name}, ?MODULE, [self(), GID], []).
@@ -132,6 +112,7 @@ do_subscribe(Event, Callback, Opts, Owner, State) ->
     OneTimeOnly = proplists:get_value(one_time_only, Opts, false),
     Timeout = proplists:get_value(timeout, Opts, infinity),
     Id = make_ref(),
+    lager:debug("Registering notification: Owner=~p, Event=~p, Callback=~p, Opts=~p", [Owner, Event, Callback, Opts]),
     Sub = #sub{id=Id, event=Event, callback=Callback, filter=Filter, one_time_only=OneTimeOnly},
     Sub1 = case Timeout of
 	       {I, Cb} when is_integer(I) ->
@@ -171,6 +152,7 @@ do_unsubscribe([], State) ->
 do_publish(Event, Data, State) ->
     #state{subscriptions=Subscriptions} = State,
     List = lists:filter(fun(#sub{event=Event2}) -> Event =:= Event2 end, lists:flatten(maps:values(Subscriptions))),
+    lager:debug("Publishing notification '~s'. Looking for candidates...", [Event]),
     do_publish(Event, Data, List, State).
 
 do_publish(Event, Data, [Sub | Rest], State) ->
@@ -184,6 +166,7 @@ do_publish(Event, Data, [Sub | Rest], State) ->
 		    ok;
                 true -> 
 		    try
+			lager:debug("Found candidate for notification '~p': Id=~p, Callback=~p", [Event, Id, Callback]),
 			dxl_callback:execute(Callback, Data)
 		    catch
 		        _ -> unsubscribe(Self, Id)

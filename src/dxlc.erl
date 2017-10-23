@@ -175,7 +175,7 @@ handle_call({subscribe, Topic, Callback}, _From, State) ->
     case Callback of
         none -> {reply, ok, State};
 	_ -> 
-            Filter = dxl_notif_man:create_topic_filter(Topic),
+            Filter = dxl_util:create_topic_filter(Topic),
             {ok, Id} = dxl_notif_man:subscribe(N, message_in, Callback, [{filter,Filter}]),
             {reply, {ok, Id}, State}
     end;
@@ -192,7 +192,8 @@ handle_call(subscriptions, _From, State) ->
   
 handle_call({send_request, Topic, Message, Timeout}, From, State) ->
     #state{dxl_client=DxlClient} = State,
-    dxl_client:send_request(DxlClient, From, Topic, Message, Timeout),
+    %Response = dxl_client:send_request(DxlClient, Topic, Message, Timeout),
+    gen_server:call(DxlClient, {send_request, From, Topic, Message}, Timeout),
     {noreply, State};
 
 handle_call({send_request_async, Topic, Message, Callback, Timeout}, _From, State) ->

@@ -8,7 +8,11 @@
 	 log_dxlmessage/2,
 	 print_dxlmessage/2,
 	 message_is_a_reply/1,
-	 message_is_a_reply/2
+	 message_is_a_reply/2,
+	 create_topic_filter/1,
+         create_topic_filter/2,
+         create_request_filter/1,
+         create_response_filter/1
 	]).
 
 -include("dxl.hrl").
@@ -74,5 +78,21 @@ message_is_a_reply(#dxlmessage{}=Message, #dxlmessage{}=Request) ->
     case {ReqMessageId, MessageId} of
         {X, X} -> message_is_a_reply(Message);
 	_ -> false
+    end.
+
+create_topic_filter(Topic) ->
+    fun({message_in, {T, _, _}}) -> Topic =:= T end.
+
+create_topic_filter(TypeIn, TopicIn) ->
+    fun({message_in, {Topic, #dxlmessage{type=Type}, _}}) when Type =:= TypeIn, Topic =:= TopicIn -> true;
+       ({message_in, {_, _, _}}) -> false
+    end.
+
+create_request_filter(Topic) ->
+    create_topic_filter(request, Topic).
+
+create_response_filter(#dxlmessage{}=Request) ->
+    fun({message_in, {_, #dxlmessage{}=Message, _}}) -> dxl_util:message_is_a_reply(Message, Request);
+       ({_, _, _}) -> false
     end.
 

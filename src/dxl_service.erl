@@ -19,7 +19,7 @@
         service_type = <<"">>                           :: binary(),
         service_id = <<"">>                             :: binary(),
         metadata = maps:new()                           :: map(),
-        topics = maps:new()				:: map(),
+        topics = []					:: map() | list(),
         ttl=60                                          :: integer(),
         dst_tenant_ids = []                             :: list()
        }).
@@ -30,7 +30,7 @@
 	id = <<"">>					:: binary(),
 	type = <<"">>					:: binary(),
 	metadata = maps:new()				:: map(),
- 	topics = maps:new()				:: map(),	
+ 	topics = []					:: map() | list(),
 	notifications = maps:new()			:: map(),
 	dst_tenant_ids = []				:: list(),
 	ttl=60						:: integer(),
@@ -181,17 +181,17 @@ send_register(State) ->
     Payload = build_registration_payload(State),
     Request = #dxlmessage{payload=Payload, dst_tenant_ids=State#state.dst_tenant_ids},
     Self = self(),
-    Fun = fun({_, #dxlmessage{type=response}, _}) -> 
+    Fun = fun({message_in, {_, #dxlmessage{type=response}, _}}) -> 
 	         gen_server:cast(Self, registration_success);
-    	     ({_, #dxlmessage{type=error, error_code=ErrCode, error_message=ErrMsg}, _}) -> 
+    	     ({message_in, {_, #dxlmessage{type=error, error_code=ErrCode, error_message=ErrMsg}, _}}) -> 
 	         gen_server:cast(Self, {registration_failed, {ErrCode, ErrMsg}})
 	  end,
     dxl_client:send_request_async(DxlClient, ?SVC_REG_REQ_TOPIC, Request, Fun, infinity),
     ok.
 
 send_subscribe(State) ->
-    #state{topics=Topics, dxl_client=DxlClient} = State,
-    send_subscribe(maps:keys(Topics), DxlClient).
+    #state{dxl_client=DxlClient} = State,
+    send_subscribe(get_topic_list(State), DxlClient).
 
 send_subscribe([Topic | Rest], DxlClient) ->
     lager:debug("Subscribing to topic: ~p.", [Topic]),
@@ -204,13 +204,18 @@ send_subscribe([], _DxlClient) ->
 
 register_callbacks(State) ->
     #state{id=Id, type=Type, topics=Topics} = State,
-    lager:debug("Registering service callbacks: ~p (~p).", [Type, Id]),
-    register_callbacks(maps:to_list(Topics), State).
+    case is_map(Topics) of
+        true ->
+	    lager:debug("Registering service callbacks: ~p (~p).", [Type, Id]),
+            register_callbacks(maps:to_list(Topics), State);
+	false ->
+    	    State
+    end.
 
 register_callbacks([{Topic, Callback} | Rest], State) ->
     #state{notif_man=NotifMan, notifications=Notifications} = State,
     lager:debug("Registering topic notification: ~p.", [Topic]),
-    Filter = fun({TopicIn, #dxlmessage{type=TypeIn}, _}) -> 
+    Filter = fun({message_in, {TopicIn, #dxlmessage{type=TypeIn}, _}}) -> 
             (TypeIn =:= request) and (TopicIn =:= Topic) 
     end,
     {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, [{filter, Filter}]),
@@ -272,7 +277,7 @@ build_registration_payload(State) ->
                    {serviceGuid, State#state.id},
                    {metaData, State#state.metadata},
                    {ttlMins, State#state.ttl},
-                   {requestChannels, maps:keys(State#state.topics)}]}).
+                   {requestChannels, get_topic_list(State)}]}).
 
 build_unregistration_payload(State) ->
     jiffy:encode({[{serviceGuid, State#state.id}]}).
@@ -283,3 +288,9 @@ update_state_from_service(Service, State) ->
                 topics=Service#service_registry.topics,
                 ttl=Service#service_registry.ttl}.
 
+get_topic_list(State) ->
+    #state{topics=Topics} = State, 
+    case Topics of
+        T when is_map(T) -> maps:keys(T);
+        T when is_list(T) -> T
+    end.

@@ -70,7 +70,7 @@
 -record(service_registry, {
         service_type = <<"">>				:: binary(),
 	metadata = maps:new()				:: map(),
-	topics = maps:new()				:: map(),
+	topics = []					:: map() | list(),
         ttl=60						:: integer()
       }).
 -type service_registry() :: #service_registry{}.
