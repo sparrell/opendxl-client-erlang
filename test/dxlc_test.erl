@@ -105,10 +105,11 @@ service_request_timeout_test() ->
 load_config() ->
     Dir = filename:dirname(filename:absname(".")),
     File = filename:join([Dir, "test", "dxlclient.config"]),
-    {ok, _Config} = dxl_client_conf:read_from_file(File).
+    {ok, Config} = dxl_client_conf:read_from_file(File),
+    Config.
 
 start_client() ->
-    {ok, Config} = load_config(),
+    Config = load_config(),
     start_client(Config).
 
 start_client(Config) ->

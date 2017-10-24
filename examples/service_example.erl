@@ -4,16 +4,14 @@
 
 -include("dxl.hrl").
 
--define(CONFIG_FILE, "/tmp/dxlclient.config").
 -define(SERVICE_TOPIC, <<"/isecg/sample/service">>).
 
 start() ->
-    lager:info("Reading configuration from file: ~s.", [?CONFIG_FILE]),
-    {ok, Config} = dxl_client_conf:read_from_file(?CONFIG_FILE),
+    Config = load_config(),
     lager:info("Connecting to broker...", []),
-    {ok, Client} = dxlc:start([Config]),
+    {ok, Client} = dxlc:start(Config),
     lager:info("Connected.", []),
-    Fun = fun({Topic, Message, ClientIn}) ->
+    Fun = fun({message_in, {Topic, Message, ClientIn}}) ->
               #dxlmessage{message_id=MessageId, payload=Payload, reply_to_topic=ReplyToTopic} = Message,
               lager:info("Service Provider - Request received: Topic=~s, ID=~s, Payload=~s", [Topic, MessageId, Payload]),
               lager:info("Service Provider - Creating a response for request ~s on ~s.", [MessageId, ReplyToTopic]),
@@ -31,4 +29,11 @@ start() ->
     dxl_util:log_dxlmessage("Got Response", Response),
     dxlc:unregister_service(Client, ServiceId),
     ok.
+
+load_config() ->
+    Dir = filename:dirname(filename:absname(".")),
+    File = filename:join([Dir, "test", "dxlclient.config"]),
+    lager:info("Reading configuration from file: ~s.", [File]),
+    {ok, Config} = dxl_client_conf:read_from_file(File),
+    Config.
 

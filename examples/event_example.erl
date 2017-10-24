@@ -4,19 +4,24 @@
 
 -include("dxl.hrl").
 
--define(CONFIG_FILE, "/tmp/dxlclient.config").
 -define(EVENT_TOPIC, <<"/isecg/sample/event">>).
 
 start() ->
-    lager:info("Reading configuration from file: ~s.", [?CONFIG_FILE]),
-    {ok, Config} = dxl_client_conf:read_from_file(?CONFIG_FILE),
+    Config = load_config(),
     lager:info("Connecting to broker...", []),
-    {ok, Client} = dxlc:start([Config]),
+    {ok, Client} = dxlc:start(Config),
     lager:info("Connected.", []),
     lager:info("Subscribing to event: ~s.", [?EVENT_TOPIC]),
-    F = fun({_Topic,Message,_}) -> dxl_util:log_dxlmessage("Received Event", Message) end,
+    F = fun({message_in, {_Topic,Message,_}}) -> dxl_util:log_dxlmessage("Received Event", Message) end,
     dxlc:subscribe(Client, ?EVENT_TOPIC, F),
     lager:info("Publishing event.", []),
     dxlc:send_event(Client, ?EVENT_TOPIC, <<"Test Message.">>),
     timer:sleep(1000),
-    ok. 
+    ok.
+
+load_config() ->
+    Dir = filename:dirname(filename:absname(".")),
+    File = filename:join([Dir, "examples", "dxlclient.config"]),
+    lager:info("Reading configuration from file: ~s.", [File]),
+    {ok, Config} = dxl_client_conf:read_from_file(File),
+    Config.

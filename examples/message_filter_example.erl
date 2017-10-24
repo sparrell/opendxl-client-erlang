@@ -4,14 +4,12 @@
 
 -include("dxl.hrl").
 
--define(CONFIG_FILE, "/tmp/dxlclient.config").
 -define(EVENT_TOPIC, <<"/isecg/sample/event">>).
 
 start() ->
-    lager:info("Reading configuration from file: ~s.", [?CONFIG_FILE]),
-    {ok, Config} = dxl_client_conf:read_from_file(?CONFIG_FILE),
+    Config = load_config(),
     lager:info("Connecting to broker...", []),
-    {ok, Client} = dxlc:start([Config]),
+    {ok, Client} = dxlc:start(Config),
     lager:info("Connected.", []),
     lager:info("Subscribing to event: ~s.", [?EVENT_TOPIC]),
     dxlc:subscribe(Client, ?EVENT_TOPIC),
@@ -19,7 +17,7 @@ start() ->
     Filter = fun({?EVENT_TOPIC, #dxlmessage{payload = <<"Test:",_Rest/bitstring>> } = Message, _}) -> true;
 	        (_) -> false
 	     end,
-    Func = fun({_Topic, Message, _DxlClient}) -> dxl_util:log_dxlmessage("Got Message", Message) end,
+    Func = fun({message_in, {_Topic, Message, _DxlClient}}) -> dxl_util:log_dxlmessage("Got Message", Message) end,
     {ok, NotificationId} = dxlc:subscribe_notification(Client, message_in, Func, [{filter, Filter}]),
 
     lager:info("Publishing event1.", []),
@@ -32,4 +30,11 @@ start() ->
     dxlc:unsubscribe_notification(Client, NotificationId),
     lager:info("Unsubscribing from event.", []),
     dxlc:unsubscribe(Client, ?EVENT_TOPIC),
-    ok. 
+    ok.
+
+load_config() ->
+    Dir = filename:dirname(filename:absname(".")),
+    File = filename:join([Dir, "test", "dxlclient.config"]),
+    lager:info("Reading configuration from file: ~s.", [File]),
+    {ok, Config} = dxl_client_conf:read_from_file(File),
+    Config.
