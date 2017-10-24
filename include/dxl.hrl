@@ -74,3 +74,8 @@
         ttl=60						:: integer()
       }).
 -type service_registry() :: #service_registry{}.
+
+-type service_id() :: binary().
+-type callback() :: {M :: module(), F :: atom() ,A :: [term()]} | function() | pid().
+-type topic() :: binary().
+-type payload() :: binary().

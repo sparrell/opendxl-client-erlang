@@ -6,6 +6,7 @@
 -include("dxl.hrl").
 
 -define(TEST_TOPIC, <<"/test/topic">>).
+-define(DEF_TIMEOUT, 1000).
 
 message_type_test() ->
     ?assertEqual(request, dxl_util:message_type(0)),
@@ -38,6 +39,23 @@ service_test() ->
     ?debugFmt("Registered Service: ~p", [ServiceId]),
      #dxlmessage{type=response, payload = Payload} = dxlc:send_request(C, TestTopic, <<"test message">>, 1000).
 
+service_async_test() ->
+    TestTopic = generate_test_topic(),
+    {ok, C} = start_client(),
+    Payload = <<"response">>,
+    Fun = fun({message_in, {_, Msg, Client}}) -> dxlc:send_response(Client, Msg, Payload) end,
+    Topics = #{ TestTopic => Fun },
+    Service = #service_registry{service_type= <<"/test/svc/type">>, topics=Topics},
+    CallbackRef = make_ref(),
+    Self = self(),
+    Callback = fun({service_registered, _Id, _Type}) -> Self ! {ok, CallbackRef};
+                  ({service_registration_failed, _Id, _Type, _Reason}) -> exit(registration_failed)
+                end,
+    {ok, ServiceId} = dxlc:register_service_async(C, Service, Callback, ?DEF_SVC_REG_TIMEOUT),
+    block_until(CallbackRef),
+    ?debugFmt("Registered Service: ~p", [ServiceId]),
+    #dxlmessage{type=response, payload = Payload} = dxlc:send_request(C, TestTopic, <<"test message">>, 1000).
+
 service_unregister_test() ->
     TestTopic = generate_test_topic(),
     {ok, C} = start_client(),
@@ -47,8 +65,33 @@ service_unregister_test() ->
     Service = #service_registry{service_type= <<"/test/svc/type">>, topics=Topics},
     {ok, ServiceId} = dxlc:register_service(C, Service),
     #dxlmessage{type=response, payload = Payload} = dxlc:send_request(C, TestTopic, <<"test message">>, 1000),
-    dxlc:unregister_service(C, ServiceId),
+    ok = dxlc:unregister_service(C, ServiceId),
     #dxlmessage{type=error} = dxlc:send_request(C, TestTopic, <<"test message">>, 100). 
+
+service_unregister_unknown_test() ->
+    {ok, C} = start_client(),
+    ServiceId = dxl_util:generate_uuid(),
+    {error, unknown_service} = dxlc:unregister_service(C, ServiceId).
+
+service_unregister_async_test() ->
+    TestTopic = generate_test_topic(),
+    {ok, C} = start_client(),
+    Payload = <<"response">>,
+    Fun = fun({message_in, {_, Msg, _}}) -> dxlc:send_response(C, Msg, Payload) end,
+    Topics = #{ TestTopic => Fun },
+    Service = #service_registry{service_type= <<"/test/svc/type">>, topics=Topics},
+    {ok, ServiceId} = dxlc:register_service(C, Service),
+    #dxlmessage{type=response, payload = Payload} = dxlc:send_request(C, TestTopic, <<"test message">>, 1000),
+
+    CallbackRef = make_ref(),
+    Self = self(),
+    Callback = fun({service_unregistered, _Id, _Type}) -> Self ! {ok, CallbackRef};
+                  ({service_unregistration_failed, _Id, _Type, _Reason}) -> exit(unregistration_failed)
+               end,
+
+    ok = dxlc:unregister_service_async(C, ServiceId, Callback, ?DEF_SVC_REG_TIMEOUT),
+    block_until(CallbackRef),
+    #dxlmessage{type=error} = dxlc:send_request(C, TestTopic, <<"test message">>, 100).
 
 service_request_timeout_test() ->
     TestTopic = generate_test_topic(),
@@ -69,9 +112,20 @@ start_client() ->
     start_client(Config).
 
 start_client(Config) ->
-    {ok, _Pid} = dxlc:start([Config]).
+    {ok, _Pid} = dxlc:start(Config).
 
 generate_test_topic() ->
     GUID = dxl_util:generate_uuid(),
     <<"/test/topic/", GUID/binary>>.
+
+block_until(Input) ->
+    block_until(Input, ?DEF_TIMEOUT).
+
+block_until(Ref, Timeout) ->
+    receive
+        {ok, Ref} -> ok
+    after
+        Timeout -> exit(timeout)
+    end.
+
 -endif.
