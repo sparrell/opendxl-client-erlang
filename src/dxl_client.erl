@@ -7,10 +7,7 @@
 	 subscribe/2,
 	 unsubscribe/2,
 	 subscriptions/1,
-	 send_request/4,
-	 send_request/5,
-	 send_request_async/3,
-	 send_request_async/5,
+	 send_request/3,
 	 send_response/3,
 	 send_error/3,
 	 send_event/3
@@ -57,17 +54,8 @@ unsubscribe(Pid, Topic) ->
 subscriptions(Pid) ->
     gen_server:call(Pid, subscriptions).
 
-send_request(Pid, Topic, Message, Timeout) ->
-    dxl_util:safe_gen_server_call(Pid, {send_request, Topic, Message}, Timeout).
-
-send_request(Pid, From, Topic, Message, Timeout) ->
-    dxl_util:safe_gen_server_call(Pid, {send_request, From, Topic, Message}, Timeout).
-
-send_request_async(Pid, Topic, Message) ->
-    gen_server:call(Pid, {send_request_async, Topic, Message}).
-
-send_request_async(Pid, Topic, Message, Callback, Timeout) ->
-    dxl_util:safe_gen_server_call(Pid, {send_request_async, Topic, Message, Callback, Timeout}, Timeout).
+send_request(Pid, Topic, Message) ->
+    gen_server:call(Pid, {send_request, Topic, Message}).
 
 send_response(Pid, Request, Message) ->
     gen_server:call(Pid, {send_response, Request, Message}).
@@ -114,43 +102,11 @@ handle_call(subscriptions, _From, State) ->
     #state{mqttc=C} = State,
     [Topic || {Topic, _Qos} <- emqttc:topics(C)];
   
-handle_call({send_request, From, Topic, Message}, _From, State) ->
-    #state{notif_man=NotifMgr, reply_to_topic=ReplyToTopic} = State,
-    Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
-    {ok, MessageId} = publish(request, Topic, Message1, State),
-    Filter = dxl_util:create_response_filter(Message1#dxlmessage{message_id=MessageId}),
-    Fun = fun({message_in, {_,M,_}}) -> 
-		dxl_util:print_dxlmessage("FOO", [M]),
-		gen_server:reply(From, M) 
-	  end,
-    Opts = [{one_time_only, true}, {filter, Filter}],
-    {ok, _} = dxl_notif_man:subscribe(NotifMgr, message_in, Fun, Opts),
-    {reply, ok, State};
-
-handle_call({send_request, Topic, Message}, From, State) ->
-    #state{notif_man=NotifMgr, reply_to_topic=ReplyToTopic} = State,
-    Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
-    {ok, MessageId} = publish(request, Topic, Message1, State),
-    Filter = dxl_util:create_response_filter(Message1#dxlmessage{message_id=MessageId}),
-    Fun = fun({message_in, {_,M,_}}) -> gen_server:reply(From, M) end,
-    Opts = [{one_time_only, true}, {filter, Filter}],
-    {ok, _} = dxl_notif_man:subscribe(NotifMgr, message_in, Fun, Opts),
-    {noreply, State};
-
-handle_call({send_request_async, Topic, Message}, _From, State) ->
+handle_call({send_request, Topic, Message}, _From, State) ->
     #state{reply_to_topic=ReplyToTopic} = State,
     Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
-    {ok, _MessageId} = publish(request, Topic, Message1, State),
-    {reply, ok, State};
-
-handle_call({send_request_async, Topic, Message, Callback, Timeout}, _From, State) ->
-    #state{reply_to_topic=ReplyToTopic, notif_man=NotifMan} = State,
-    Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
     {ok, MessageId} = publish(request, Topic, Message1, State),
-    Filter = dxl_util:create_response_filter(Message1#dxlmessage{message_id=MessageId}),
-    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
-    {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
-    {reply, {ok, NotifId}, State};
+    {reply, {ok, MessageId}, State};
 
 handle_call({send_response, Request, Message}, _From, State) ->
     #dxlmessage{reply_to_topic=ReplyToTopic} = Request,

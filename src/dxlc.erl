@@ -41,6 +41,7 @@
 -include("dxl.hrl").
 
 -record(state, {
+	parent						:: pid(),
 	dxl_client					:: pid(),
 	notif_man					:: pid(),
 	service_man					:: pid(),
@@ -55,7 +56,9 @@
 %%% API functions
 %%%============================================================================
 start([Opts]) ->
-    case gen_server:start_link(?MODULE, [Opts], []) of
+    GID = dxl_util:generate_uuid(),
+    Name = dxl_util:module_reg_name(GID, ?MODULE),
+    case gen_server:start_link({local, Name}, ?MODULE, [self(), GID, Opts], []) of
         {ok, Pid} -> 
 	    gen_server:call(Pid, wait_until_connected),
 	    {ok, Pid};
@@ -64,7 +67,9 @@ start([Opts]) ->
     end.
 
 start_async([Opts]) ->
-    gen_server:start_link(?MODULE, [Opts], []).
+    GID = dxl_util:generate_uuid(),
+    Name = dxl_util:module_reg_name(GID, ?MODULE),
+    gen_server:start_link({local, Name}, ?MODULE, [self(), GID, Opts], []).
 
 is_connected(Pid) ->
     gen_server:call(Pid, is_connected).
@@ -115,7 +120,7 @@ send_request(Pid, Topic, Message, Timeout) when is_binary(Message) ->
     send_request(Pid, Topic, #dxlmessage{payload=Message}, Timeout);
 
 send_request(Pid, Topic, #dxlmessage{}=Message, Timeout) ->
-    gen_server:call(Pid, {send_request, Topic, Message, Timeout}, infinity).
+    dxl_util:safe_gen_server_call(Pid, {send_request, Topic, Message, Timeout}, Timeout).
 
 send_request_async(Pid, Topic, Message) ->
     gen_server:call(Pid, {send_request_async, Topic, Message}, infinity).
@@ -153,13 +158,13 @@ unsubscribe_notification(Pid, Id) ->
 %%%============================================================================
 %%% gen_server functions
 %%%============================================================================
-init([MqttOpts]) ->
-    GID = dxl_util:generate_uuid(),
+init([Parent, GID, MqttOpts]) ->
     {ok, NotifMan} = dxl_notif_man:start_link(GID),
     {ok, ServiceMan} = dxl_service_man:start_link(GID),
     {ok, DxlClient} = dxl_client:start_link([GID, MqttOpts]),
 
-    {ok, #state{dxl_client=DxlClient,
+    {ok, #state{parent=Parent,
+		dxl_client=DxlClient,
 		notif_man=NotifMan,
 		service_man=ServiceMan}}.
 
@@ -191,15 +196,28 @@ handle_call(subscriptions, _From, State) ->
     {reply, {ok, Subs}, State};
   
 handle_call({send_request, Topic, Message, Timeout}, From, State) ->
-    #state{dxl_client=DxlClient} = State,
-    %Response = dxl_client:send_request(DxlClient, Topic, Message, Timeout),
-    gen_server:call(DxlClient, {send_request, From, Topic, Message}, Timeout),
+    #state{dxl_client=DxlClient, notif_man=NotifMan} = State,
+    {ok, MessageId} = dxl_client:send_request(DxlClient, Topic, Message),
+    Filter = dxl_util:create_response_filter(Message#dxlmessage{message_id=MessageId}),
+    Fun = fun({message_in, {_,M,_}}) -> gen_server:reply(From, M) end,
+    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
+    {ok, _} = dxl_notif_man:subscribe(NotifMan, message_in, Fun, Opts),
     {noreply, State};
 
+handle_call({send_request_async, Topic, Message}, _From, State) ->
+    #state{reply_to_topic=ReplyToTopic, dxl_client=DxlClient} = State,
+    Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
+    {ok, MessageId} = dxl_client:send_request(DxlClient, Topic, Message1),
+    {reply, {ok, MessageId}, State};
+
 handle_call({send_request_async, Topic, Message, Callback, Timeout}, _From, State) ->
-    #state{dxl_client=DxlClient} = State,
-    Result = dxl_client:send_request_async(DxlClient, Topic, Message, Callback, Timeout),
-    {reply, Result, State};
+    #state{reply_to_topic=ReplyToTopic, dxl_client=DxlClient, notif_man=NotifMan} = State,
+    Message1 = Message#dxlmessage{reply_to_topic=ReplyToTopic},
+    {ok, MessageId} = dxl_client:send_request(DxlClient, Topic, Message1),
+    Filter = dxl_util:create_response_filter(Message1#dxlmessage{message_id=MessageId}),
+    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
+    {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
+    {reply, {ok, NotifId}, State};
 
 handle_call({send_response, Request, Message}, _From, State) ->
     #state{dxl_client=DxlClient} = State,

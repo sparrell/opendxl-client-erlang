@@ -26,7 +26,9 @@
 -type service_info() :: #service_info{}.
 
 -record(state, {
+	parent						:: pid(),
 	gid = <<"">>					:: binary(),
+	dxlc						:: pid(),
 	id = <<"">>					:: binary(),
 	type = <<"">>					:: binary(),
 	metadata = maps:new()				:: map(),
@@ -38,7 +40,7 @@
 	connected = false				:: true | false,
 	registered = false				:: true | false,
 	shutdown = false				:: true | false,
-	dxl_client					:: term(),
+	client						:: term(),
         notif_man					:: term()
       }).
 
@@ -47,7 +49,7 @@
 %%%============================================================================
 start_link(GID, Service) ->
     Id = dxl_util:generate_uuid(),
-    case gen_server:start_link(?MODULE, [GID, Id, Service], []) of
+    case gen_server:start_link(?MODULE, [self(), GID, Id, Service], []) of
         {ok, Pid} -> {ok, {Id, Pid}};
         R -> R
     end.
@@ -55,13 +57,14 @@ start_link(GID, Service) ->
 %%%============================================================================
 %%% gen_server functions
 %%%============================================================================
-init([GID, Id, Service]) ->
-    DxlClient = dxl_util:module_reg_name(GID, dxl_client),
+init([Parent, GID, Id, Service]) ->
+    Client = dxl_util:module_reg_name(GID, dxlc),
     NotifMan = dxl_util:module_reg_name(GID, dxl_notif_man),
-    Connected = dxl_client:is_connected(DxlClient),
-    BaseState = #state{gid=GID,
+    Connected = dxlc:is_connected(Client),
+    BaseState = #state{parent=Parent,
+		       gid=GID,
 		       id=Id,
-		       dxl_client=DxlClient,
+		       client=Client,
 		       notif_man=NotifMan,
 		       connected=Connected},
 
@@ -176,7 +179,7 @@ do_register(State) ->
     State.
 
 send_register(State) ->
-    #state{id=Id, type=Type, dxl_client=DxlClient} = State,
+    #state{id=Id, type=Type, parent=Parent} = State,
     lager:debug("Sending DXL service registration: ~p (~p).", [Type, Id]),
     Payload = build_registration_payload(State),
     Request = #dxlmessage{payload=Payload, dst_tenant_ids=State#state.dst_tenant_ids},
@@ -186,20 +189,20 @@ send_register(State) ->
     	     ({message_in, {_, #dxlmessage{type=error, error_code=ErrCode, error_message=ErrMsg}, _}}) -> 
 	         gen_server:cast(Self, {registration_failed, {ErrCode, ErrMsg}})
 	  end,
-    dxl_client:send_request_async(DxlClient, ?SVC_REG_REQ_TOPIC, Request, Fun, infinity),
+    dxlc:send_request_async(Parent, ?SVC_REG_REQ_TOPIC, Request, Fun, infinity),
     ok.
 
 send_subscribe(State) ->
-    #state{dxl_client=DxlClient} = State,
-    send_subscribe(get_topic_list(State), DxlClient).
+    #state{client=Client} = State,
+    send_subscribe(get_topic_list(State), Client).
 
-send_subscribe([Topic | Rest], DxlClient) ->
+send_subscribe([Topic | Rest], Client) ->
     lager:debug("Subscribing to topic: ~p.", [Topic]),
-    dxl_client:subscribe(DxlClient, Topic),
-    send_subscribe(Rest, DxlClient),
+    dxlc:subscribe(Client, Topic),
+    send_subscribe(Rest, Client),
     ok;
 
-send_subscribe([], _DxlClient) ->
+send_subscribe([], _Client) ->
     ok.
 
 register_callbacks(State) ->
@@ -238,24 +241,24 @@ do_unregister(State) ->
     State.
 
 send_unregister(State) ->
-    #state{id=Id, type=Type, dxl_client=DxlClient} = State,
+    #state{id=Id, type=Type, parent=Parent} = State,
     lager:debug("Sending DXL service unregistration: ~p (~p).", [Type, Id]),
     Payload = build_unregistration_payload(State),
     Request = #dxlmessage{payload=Payload},
-    dxl_client:send_request_async(DxlClient, ?SVC_UNREG_REQ_TOPIC, Request),
+    dxlc:send_request_async(Parent, ?SVC_UNREG_REQ_TOPIC, Request),
     ok.
 
 send_unsubscribe(State) ->
-    #state{dxl_client=DxlClient, topics=Topics} = State,
-    send_unsubscribe(maps:keys(Topics), DxlClient).
+    #state{client=Client, topics=Topics} = State,
+    send_unsubscribe(maps:keys(Topics), Client).
 
-send_unsubscribe([], _DxlClient) ->
+send_unsubscribe([], _Client) ->
     ok;
 
-send_unsubscribe([Topic | Rest], DxlClient) ->
+send_unsubscribe([Topic | Rest], Client) ->
     lager:debug("Unsubscribing from topic: ~p.", [Topic]),
-    dxl_client:unsubscribe(DxlClient, Topic),
-    send_unsubscribe(Rest, DxlClient),
+    dxlc:unsubscribe(Client, Topic),
+    send_unsubscribe(Rest, Client),
     ok.
 
 unregister_callbacks(State) ->

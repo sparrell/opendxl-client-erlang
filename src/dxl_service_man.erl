@@ -23,7 +23,7 @@
 -record(state, {
 	parent					:: pid(),
 	gid					:: binary(),
-	dxl_client				:: pid(),
+	client					:: pid(),
 	notif_man				:: pid(),
 	services = maps:new()			:: map()
       }).
@@ -52,9 +52,9 @@ update_service(Pid, Id, #service_registry{} = Service, Timeout) ->
 %%% gen_server functions
 %%%============================================================================
 init([Parent, GID]) ->
-    DxlClient = dxl_util:module_reg_name(GID, dxl_client),
+    Client = dxl_util:module_reg_name(GID, dxl_client),
     NotifMan = dxl_util:module_reg_name(GID, dxl_notif_man),
-    State = #state{parent=Parent, gid=GID, dxl_client=DxlClient, notif_man=NotifMan},
+    State = #state{parent=Parent, gid=GID, client=Client, notif_man=NotifMan},
     {ok, State}.
 
 handle_call({register, Service, Timeout}, From, State) ->

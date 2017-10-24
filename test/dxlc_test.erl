@@ -30,10 +30,12 @@ event_test() ->
 service_test() ->
     TestTopic = generate_test_topic(),
     {ok, C} = start_client(),
-    Fun = fun({message_in, {_, Msg, _}}) -> dxlc:send_response(C, Msg, <<"response">>) end,
+    Payload = <<"response">>,
+    Fun = fun({message_in, {_, Msg, Client}}) -> dxlc:send_response(Client, Msg, Payload) end,
     Topics = #{ TestTopic => Fun },
     Service = #service_registry{service_type= <<"/test/svc/type">>, topics=Topics},
-    {ok, _ServiceId} = dxlc:register_service(C, Service),
+    {ok, ServiceId} = dxlc:register_service(C, Service),
+    ?debugFmt("Registered Service: ~p", [ServiceId]),
      #dxlmessage{type=response, payload = Payload} = dxlc:send_request(C, TestTopic, <<"test message">>, 1000).
 
 service_unregister_test() ->
@@ -51,11 +53,10 @@ service_unregister_test() ->
 service_request_timeout_test() ->
     TestTopic = generate_test_topic(),
     {ok, C} = start_client(),
-    Payload = <<"response">>,
-    Fun = fun({message_in, {_, Msg, _}}) -> ok end,
+    Fun = fun({message_in, {_, _, _}}) -> ok end,
     Topics = #{ TestTopic => Fun },
     Service = #service_registry{service_type= <<"/test/svc/type">>, topics=Topics},
-    {ok, ServiceId} = dxlc:register_service(C, Service),
+    {ok, _ServiceId} = dxlc:register_service(C, Service),
     {error, timeout} = dxlc:send_request(C, TestTopic, <<"test message">>, 1000).
 
 load_config() ->
