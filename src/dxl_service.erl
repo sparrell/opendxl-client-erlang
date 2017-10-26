@@ -1,3 +1,7 @@
+%%%----------------------------------------------------------------------------
+%%% @author Chris Waymire <chris@waymire.net>
+%%% @private
+%%%----------------------------------------------------------------------------
 -module(dxl_service).
 
 -behaviour(gen_server).
@@ -5,7 +9,8 @@
 %% API
 -export([start_link/4,
          stop/2,
-         update/2
+         refresh/2,
+         update/3
 ]).
 
 %% gen_server callbacks
@@ -23,155 +28,74 @@
     service_type = <<"">> :: binary(),
     service_id = <<"">> :: binary(),
     metadata = maps:new() :: map(),
-    topics = [] :: map() | list(),
+    topics = [] :: list(),
     ttl = 60 :: integer(),
     dst_tenant_ids = [] :: list()
 }).
 -type service_info() :: #service_info{}.
 
 -record(state, {
-    parent :: pid(),
-    gid = <<"">> :: binary(),
-    client :: term(),
-    dxl_conn :: term(),
-    notif_man :: term(),
+    gid :: binary(),
+    client :: atom(),
+    dxl_conn :: atom(),
+    notif_man :: atom(),
+
     id = <<"">> :: binary(),
     type = <<"">> :: binary(),
     metadata = maps:new() :: map(),
-    topics = [] :: map() | list(),
-    notifications = maps:new() :: map(),
+    topics = [] :: list(),
     dst_tenant_ids = [] :: list(),
     ttl = 60 :: integer(),
     ttl_timer = make_ref() :: reference(),
+
     connected = false :: true | false,
     registered = false :: true | false,
+    subscribed = false :: true | false,
     shutdown = false :: true | false,
-    registration_timer = make_ref() :: reference(),
-    unregistration_timer = make_ref() :: reference()
+    registration_timer = make_ref() :: reference()
 }).
 -type state() :: #state{}.
 
-%%%============================================================================
-%%% API functions
-%%%============================================================================
+%%%----------------------------------------------------------------------------
+%%% Public functions
+%%%----------------------------------------------------------------------------
 start_link(GID, Id, Service, Timeout) ->
-    gen_server:start_link(?MODULE, [self(), GID, Id, Service, Timeout], []).
+    gen_server:start_link(?MODULE, [GID, Id, Service, Timeout], []).
 
 stop(Pid, Timeout) ->
-    gen_server:cast(Pid, {stop, Timeout}).
+    gen_server:call(Pid, {stop, Timeout}).
 
-update(Pid, Service) ->
-    gen_server:cast(Pid, {update, Service}).
+update(Pid, Service, Timeout) ->
+    gen_server:call(Pid, {update, Service, Timeout}).
 
-%%%============================================================================
+refresh(Pid, Timeout) ->
+    gen_server:call(Pid, {update, Timeout}).
+
+%%%----------------------------------------------------------------------------
 %%% gen_server functions
-%%%============================================================================
-init([Parent, GID, Id, Service, Timeout]) ->
+%%%----------------------------------------------------------------------------
+init([GID, Id, #service_registration{} = Registration, Timeout]) ->
     Client = dxl_util:module_reg_name(GID, dxlc),
     DxlConn = dxl_util:module_reg_name(GID, dxl_conn),
     NotifMan = dxl_util:module_reg_name(GID, dxl_notif_man),
     Connected = is_connected(DxlConn),
-    BaseState = #state{parent    = Parent,
-                       gid       = GID,
-                       id        = Id,
-                       client    = Client,
-                       notif_man = NotifMan,
-                       dxl_conn  = DxlConn,
-                       connected = Connected},
+    State1 = #state{gid          = GID,
+                    id           = Id,
+                    client       = Client,
+                    notif_man    = NotifMan,
+                    dxl_conn     = DxlConn,
+                    connected    = Connected
+    },
+    State2 = update_state_from_registration(Registration, State1),
 
-    State = update_state_from_service(Service, BaseState),
-
-    dxl_notif_man:subscribe(NotifMan, connected, self()),
-    dxl_notif_man:subscribe(NotifMan, disconnected, self()),
-
+    lager:debug("Starting service: ~p (~p).", [State2#state.type, Id]),
+    dxl_notif_man:subscribe(NotifMan, connection, self()),
     RegTimer = erlang:send_after(Timeout, self(), {registration_failed, timeout}),
+    {ok, State2#state{registration_timer = RegTimer}, 0}.
 
-    {ok, State#state{registration_timer=RegTimer}, 0}.
 
-
-handle_call(_Request, _From, State) ->
-    {reply, ignored, State}.
-
-handle_cast({stop, Timeout}, State) ->
-    Timer = erlang:send_after(Timeout, self(), {unregistration_failed, timeout}),
-    do_unregister(State),
-    {noreply, State#state{shutdown = true, unregistration_timer = Timer}};
-
-handle_cast(update, State) ->
-    State1 = do_update(State),
-    {noreply, State1};
-
-handle_cast({update, Service}, State) ->
-    State1 = do_update(Service, State),
-    {noreply, State1};
-
-handle_cast(shutdown, #state{registered = false} = State) ->
-    {stop, normal, State};
-
-handle_cast(shutdown, #state{connected = true} = State) ->
-    State1 = do_unregister(State),
-    {stop, normal, State1#state{shutdown = true}};
-
-handle_cast(shutdown, State) ->
-    lager:debug("Delaying shutdown until connected.", []),
-    {noreply, State#state{shutdown = true}};
-
-handle_cast(registration_success, State) ->
-    #state{id = Id, type = Type, notif_man = NotifMan, registration_timer = RegTimer} = State,
-    erlang:cancel_timer(RegTimer),
-    dxl_notif_man:publish(NotifMan, service_registered, {service_registered, Id, Type}),
-    {noreply, State#state{registered = true}};
-
-handle_cast({registration_failed, Reason}, State) ->
-    #state{id = Id, type = Type, notif_man = NotifMan, registration_timer = RegTimer} = State,
-    erlang:cancel_timer(RegTimer),
-    dxl_notif_man:publish(NotifMan, service_registration_failed, {service_registration_failed, Id, Type, Reason}),
-    {stop, normal, State#state{registered = false}};
-
-handle_cast(unregistration_success, State) ->
-    #state{id = Id, type = Type, notif_man = NotifMan, unregistration_timer = UnregTimer} = State,
-    erlang:cancel_timer(UnregTimer),
-    dxl_notif_man:publish(NotifMan, service_unregistered, {service_unregistered, Id, Type}),
-    {stop, normal, State#state{registered = false}};
-
-handle_cast({unregistration_failed, Reason}, State) ->
-    #state{id = Id, type = Type, notif_man = NotifMan, unregistration_timer = UnregTimer} = State,
-    erlang:cancel_timer(UnregTimer),
-    dxl_notif_man:publish(NotifMan, service_unregisteration_failed, {service_unregisteration_failed, Id, Type, Reason}),
-    {stop, normal, State#state{registered = false}};
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info({connected, _Client}, #state{connected = false, shutdown = true} = State) ->
-    lager:debug("Processing shutdown request.", []),
-    State1 = do_unregister(State#state{connected = true}),
-    {stop, normal, State1};
-
-handle_info({connected, _Client}, #state{connected = false, shutdown = false} = State) ->
-    State1 = do_register(State#state{connected = true}),
-    State2 = reset_ttl_timer(State1),
-    {noreply, State2};
-
-handle_info({disconnected, _Client}, #state{connected = true} = State) ->
-    State1 = clear_ttl_timer(State),
-    {noreply, State1#state{connected = false}};
-
-handle_info(timeout, #state{connected=false} = State) ->
-    lager:debug("ignoring timeout because we are not connected.", []),
-    {noreply, State};
-
-handle_info(timeout, #state{connected=true} = State) ->
-    lager:debug("Registering...", []),
-    State1 = do_register(State),
-    {noreply, State1};
-
-handle_info(Info, State) ->
-    lager:debug("ignoring message: ~p", [Info]),
-    {noreply, State}.
-
-terminate(_Reason, #state{registered = true} = State) ->
-    do_unregister(State),
+terminate(_Reason, #state{connected = true, registered = true} = State) ->
+    do_deregister(State),
     ok;
 
 terminate(_Reason, _State) ->
@@ -180,52 +104,83 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-%%%============================================================================
+handle_call({stop, Timeout}, From, State) ->
+    #state{id = Id} = State,
+    lager:debug("[Service:~p] Received stop request from: ~p", [Id, From]),
+    Timer = erlang:send_after(Timeout, self(), {deregistration_failed, timeout}),
+    do_deregister(State),
+    {reply, ok, State#state{shutdown = true, registration_timer = Timer}}.
+
+handle_cast(registration_success, State) ->
+    #state{id = Id, type = Type, notif_man = NotifMan, registration_timer = RegTimer} = State,
+    lager:debug("[Service:~p] Registration succeeded.", [Id]),
+    erlang:cancel_timer(RegTimer),
+    State1 = register_topics(State),
+    dxl_notif_man:publish(NotifMan, service, {service_registered, Id, Type}),
+    {noreply, State1#state{registered = true}};
+
+handle_cast({registration_failed, Reason}, State) ->
+    #state{id = Id, type = Type, notif_man = NotifMan, registration_timer = RegTimer} = State,
+    lager:debug("[Service:~p] Registration failed.", [Id]),
+    erlang:cancel_timer(RegTimer),
+    dxl_notif_man:publish(NotifMan, service, {service_registration_failed, Id, Type, Reason}),
+    {stop, normal, State#state{registered = false}};
+
+handle_cast(deregistration_success, State) ->
+    #state{id = Id, type = Type, notif_man = NotifMan, registration_timer = RegTimer} = State,
+    lager:debug("[Service:~p] De-Registration succeeded.", [Id]),
+    erlang:cancel_timer(RegTimer),
+    State1 = deregister_topics(State),
+    dxl_notif_man:publish(NotifMan, service, {service_deregistered, Id, Type}),
+    {stop, normal, State1#state{registered = false}};
+
+handle_cast({deregistration_failed, Reason}, State) ->
+    #state{id = Id} = State,
+    lager:debug("[Service:~p] De-Registration failed.", [Id]),
+    #state{id = Id, type = Type, notif_man = NotifMan, registration_timer = RegTimer} = State,
+    erlang:cancel_timer(RegTimer),
+    State1 = deregister_topics(State),
+    dxl_notif_man:publish(NotifMan, service, {service_deregisteration_failed, Id, Type, Reason}),
+    {stop, normal, State1#state{registered = false}}.
+
+handle_info({connected, _Client}, #state{connected = false, shutdown = true} = State) ->
+    #state{id = Id} = State,
+    lager:debug("[Service:~p] Processing the pending shutdown request.", [Id]),
+    State1 = do_deregister(State#state{connected = true}),
+    {stop, normal, State1};
+
+handle_info({connected, _Client}, #state{connected = false, shutdown = false} = State) ->
+    #state{id = Id} = State,
+    lager:debug("[Service:~p] Client connected. Starting registration.", [Id]),
+    State1 = do_register(State#state{connected = true}),
+    {noreply, State1};
+
+handle_info({disconnected, _Client}, #state{connected = true} = State) ->
+    #state{id = Id} = State,
+    lager:debug("[Service:~p] Client disconnected. Going idle.", [Id]),
+    State1 = clear_ttl_timer(State),
+    {noreply, State1#state{connected = false}};
+
+handle_info(timeout, #state{connected=false} = State) ->
+    {noreply, State};
+
+handle_info(timeout, #state{connected=true} = State) ->
+    State1 = do_register(State),
+    {noreply, State1}.
+
+%%%----------------------------------------------------------------------------
 %%% Internal functions
-%%%============================================================================
-do_update(State) ->
-    do_register(State).
-
-do_update(Service, State) ->
-    State1 = update_state_from_service(Service, State),
-    do_register(State1).
-
-reset_ttl_timer(State) ->
-    #state{ttl_timer = Timer, ttl = TTL} = State,
-    stop_ttl_timer(Timer),
-    NewTimer = start_ttl_timer(TTL),
-    State#state{ttl_timer = NewTimer}.
-
-clear_ttl_timer(State) ->
-    #state{ttl_timer = Timer} = State,
-    stop_ttl_timer(Timer),
-    State#state{ttl_timer = undefined}.
-
-stop_ttl_timer(Timer) when is_reference(Timer) ->
-    erlang:cancel_timer(Timer),
-    ok;
-
-stop_ttl_timer(_Timer) ->
-    ok.
-
-start_ttl_timer(TTLMins) ->
-    TTLMillis = TTLMins * 60 * 1000,
-    erlang:send_after(TTLMillis, self(), ttl_timeout).
-
-do_register(#state{connected = true} = State) ->
-    #state{id = Id, type = Type} = State,
-    lager:debug("Registering service: ~p (~p).", [Type, Id]),
-    send_register(State),
-    send_subscribe(State),
-    State1 = register_callbacks(State),
-    State1;
-
+%%%----------------------------------------------------------------------------
 do_register(State) ->
-    State.
+    #state{id = Id} = State,
+    lager:debug("[Service:~p] Starting service registration.", [Id]),
+    send_registration_request(State),
+    State1 = reset_ttl_timer(State),
+    State1#state{registered = false}.
 
-send_register(State) ->
-    #state{id = Id, type = Type, dxl_conn = DxlConn} = State,
-    lager:debug("Sending DXL service registration: ~p (~p).", [Type, Id]),
+send_registration_request(State) ->
+    #state{id = Id, dxl_conn = DxlConn} = State,
+    lager:debug("[Service:~p] Sending DXL service registration request.", [Id]),
     Payload = build_registration_payload(State),
     Request = #dxlmessage{payload = Payload, dst_tenant_ids = State#state.dst_tenant_ids},
     Self = self(),
@@ -237,119 +192,132 @@ send_register(State) ->
     dxl_conn:send_request_async(DxlConn, ?SVC_REG_REQ_TOPIC, Request, Fun, infinity),
     ok.
 
-send_subscribe(State) ->
-    #state{dxl_conn = DxlConn} = State,
-    send_subscribe(get_topic_list(State), DxlConn).
+register_topics(#state{subscribed = true} = State) ->
+    State;
 
-send_subscribe([Topic | Rest], DxlConn) ->
-    lager:debug("Subscribing to topic: ~p.", [Topic]),
+register_topics(#state{subscribed = false} = State) ->
+    #state{id = Id, topics = Topics} = State,
+    lager:debug("[Service:~p] Subscribing to topics and registering callbacks.", [Id]),
+    register_topics(Topics, State#state{subscribed = true}).
+
+register_topics([{Topic, Callback, _} | Rest], State) ->
+    #state{id = Id, dxl_conn = DxlConn, notif_man = NotifMan, topics = Topics} = State,
+    lager:debug("[Service:~p] Registering callback for topic: ~p.", [Id, Topic]),
+    NotifId = subscribe_to_notification(Topic, Callback, NotifMan),
+    lager:debug("[Service:~p] Subscribing to topic: ~p.", [Id, Topic]),
     dxl_conn:subscribe(DxlConn, Topic),
-    send_subscribe(Rest, DxlConn),
-    ok;
+    UpdatedTopics = [{Topic, Callback, NotifId} | proplists:delete(Topic, Topics)],
+    register_topics(Rest, State#state{topics = UpdatedTopics});
 
-send_subscribe([], _Client) ->
-    ok.
+register_topics([], State) ->
+    State.
 
-register_callbacks(State) ->
-    #state{id = Id, type = Type, topics = Topics} = State,
-    case is_map(Topics) of
-        true ->
-            lager:debug("Registering service callbacks: ~p (~p).", [Type, Id]),
-            register_callbacks(maps:to_list(Topics), State);
-        false ->
-            State
-    end.
+subscribe_to_notification(_Topic, undefined, _NotifMan) ->
+    undefined;
 
-register_callbacks([{Topic, Callback} | Rest], State) ->
-    #state{notif_man = NotifMan, notifications = Notifications} = State,
-    lager:debug("Registering topic notification: ~p.", [Topic]),
+subscribe_to_notification(Topic, Callback, NotifMan) ->
     Filter = fun({message_in, {TopicIn, #dxlmessage{type = TypeIn}, _}}) ->
         (TypeIn =:= request) and (TopicIn =:= Topic)
              end,
     {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, [{filter, Filter}]),
-    NewNotifications = maps:put(Topic, NotifId, Notifications),
-    register_callbacks(Rest, State#state{notifications = NewNotifications});
+    NotifId.
 
-register_callbacks([], State) ->
-    State.
-
-do_unregister(#state{connected = true} = State) ->
+do_deregister(State) ->
     #state{id = Id, type = Type} = State,
-    lager:debug("Unregistering service: ~p (~p).", [Type, Id]),
-    send_unregister(State),
-    send_unsubscribe(State),
-    State1 = unregister_callbacks(State),
-    State1;
+    lager:debug("[Service:~p] Starting service deregistration.", [Id]),
+    send_deregistration_request(State),
+    clear_ttl_timer(State).
 
-do_unregister(State) ->
-    State.
-
-send_unregister(State) ->
-    #state{id = Id, type = Type, dxl_conn = DxlConn} = State,
-    lager:debug("Sending DXL service unregistration: ~p (~p).", [Type, Id]),
-    Payload = build_unregistration_payload(State),
+send_deregistration_request(State) ->
+    #state{id = Id, dxl_conn = DxlConn} = State,
+    lager:debug("[Service:~p] Sending DXL service registration request.", [Id]),
+    Payload = build_deregistration_payload(State),
     Request = #dxlmessage{payload = Payload},
     Self = self(),
     Fun = fun({message_in, {_, #dxlmessage{type = response}, _}}) ->
-                 gen_server:cast(Self, unregistration_success);
+                 gen_server:cast(Self, deregistration_success);
              ({message_in, {_, #dxlmessage{type = error, error_code = ErrCode, error_message = ErrMsg}, _}}) ->
-                 gen_server:cast(Self, {unregistration_failed, {ErrCode, ErrMsg}})
+                 gen_server:cast(Self, {deregistration_failed, {ErrCode, ErrMsg}})
           end,
     dxl_conn:send_request_async(DxlConn, ?SVC_UNREG_REQ_TOPIC, Request, Fun, infinity),
-    ok.
-
-send_unsubscribe(State) ->
-    #state{dxl_conn = DxlConn, topics = Topics} = State,
-    send_unsubscribe(maps:keys(Topics), DxlConn).
-
-send_unsubscribe([], _DxlConn) ->
-    ok;
-
-send_unsubscribe([Topic | Rest], DxlConn) ->
-    lager:debug("Unsubscribing from topic: ~p.", [Topic]),
-    dxlc:unsubscribe(DxlConn, Topic),
-    send_unsubscribe(Rest, DxlConn),
-    ok.
-
-unregister_callbacks(State) ->
-    #state{notifications = Notifications} = State,
-    unregister_callbacks(maps:to_list(Notifications), State).
-
-unregister_callbacks([{Topic, Id} | Rest], State) ->
-    #state{notif_man = NotifMan, notifications = Notifications} = State,
-    lager:debug("Unregistering topic notification: ~p.", [Topic]),
-    dxl_notif_man:unsubscribe(NotifMan, Id),
-    NewNotifications = maps:remove(Topic, Notifications),
-    unregister_callbacks(Rest, State#state{notifications = NewNotifications});
-
-unregister_callbacks([], State) ->
     State.
 
+deregister_topics(State) ->
+    #state{id = Id, topics = Topics} = State,
+    lager:debug("[Service:~p] Unsubscribing from topics and deregistering callbacks.", [Id]),
+    deregister_topics(Topics, State).
+
+deregister_topics([{Topic, _Callback, NotifId} | Rest], State) ->
+    #state{id = Id, dxl_conn = DxlConn, notif_man = NotifMan, topics = Topics} = State,
+    lager:debug("[Service:~p] Unsubscribing from topic: ~p.", [Id, Topic]),
+    dxl_conn:unsubscribe(DxlConn, Topic),
+    lager:debug("[Service:~p] De-Registering callback for topic: ~p.", [Id, Topic]),
+    dxl_notif_man:unsubscribe(NotifMan, NotifId),
+    UpdatedTopics = proplists:delete(Topic, Topics),
+    deregister_topics(Rest, State#state{topics = UpdatedTopics});
+
+deregister_topics([], State) ->
+    State.
+
+%%%----------------------------------------------------------------------------
+%%% TTL timer functions
+%%%----------------------------------------------------------------------------
+reset_ttl_timer(State) ->
+    #state{id = Id, ttl_timer = Timer, ttl = TTL} = State,
+    lager:debug("[Service:~p] Resetting TTL timer.", [Id]),
+    stop_ttl_timer(Timer),
+    NewTimer = start_ttl_timer(TTL),
+    State#state{ttl_timer = NewTimer}.
+
+clear_ttl_timer(State) ->
+    #state{id = Id, ttl_timer = Timer} = State,
+    lager:debug("[Service:~p] Clearing TTL timer.", [Id]),
+    stop_ttl_timer(Timer),
+    State#state{ttl_timer = undefined}.
+
+start_ttl_timer(TTLMins) ->
+    TTLMillis = TTLMins * 60 * 1000,
+    erlang:send_after(TTLMillis, self(), ttl_timeout).
+
+stop_ttl_timer(Timer) when is_reference(Timer) ->
+    erlang:cancel_timer(Timer),
+    ok;
+
+stop_ttl_timer(_Timer) ->
+    ok.
+
+%%%----------------------------------------------------------------------------
+%%% Registration payload functions
+%%%----------------------------------------------------------------------------
 build_registration_payload(State) ->
-    jiffy:encode({[{serviceType, State#state.type},
-                   {serviceGuid, State#state.id},
+    jiffy:encode({[{serviceGuid, State#state.id},
+                   {serviceType, State#state.type},
                    {metaData, State#state.metadata},
                    {ttlMins, State#state.ttl},
-                   {requestChannels, get_topic_list(State)}]}).
+                   {requestChannels, proplists:get_keys(State#state.topics)}]}).
 
-build_unregistration_payload(State) ->
+build_deregistration_payload(State) ->
     jiffy:encode({[{serviceGuid, State#state.id}]}).
 
-update_state_from_service(Service, State) ->
-    State#state{type     = Service#service_registry.service_type,
-                metadata = Service#service_registry.metadata,
-                topics   = Service#service_registry.topics,
-                ttl      = Service#service_registry.ttl}.
 
-get_topic_list(State) ->
-    #state{topics = Topics} = State,
-    case Topics of
-        T when is_map(T) -> maps:keys(T);
-        T when is_list(T) -> T
-    end.
+%%%----------------------------------------------------------------------------
+%%% Misc functions
+%%%----------------------------------------------------------------------------
 
 is_connected(DxlConn) ->
     case dxl_conn:is_connected(DxlConn) of
         {true, _} -> true;
         false -> false
     end.
+
+normalize_topics(Topics) when is_map(Topics) ->
+    normalize_topics(maps:to_list(Topics));
+
+normalize_topics(Topics) when is_list(Topics) ->
+    [{K, V, undefined} || {K, V} <- proplists:unfold(Topics)].
+
+update_state_from_registration(Registration, State) ->
+    State#state{type     = Registration#service_registration.type,
+                metadata = Registration#service_registration.metadata,
+                topics   = normalize_topics(Registration#service_registration.topics),
+                ttl      = Registration#service_registration.ttl}.

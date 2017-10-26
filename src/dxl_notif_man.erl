@@ -20,8 +20,8 @@
 -include("dxl.hrl").
 
 -record(state, {
-    gid :: binary(),
     parent :: pid(),
+    gid :: binary(),
     module :: atom(),
     subscriptions = maps:new() :: map()
 }).
@@ -29,7 +29,7 @@
 -record(sub, {
     owner :: pid(),
     id :: reference(),
-    event :: term(),
+    category :: atom(),
     callback :: term(),
     filter = none :: term(),
     timer = make_ref() :: reference(),
@@ -46,8 +46,8 @@ start_link(GID) ->
 subscribe(Pid, Event, Callback) ->
     gen_server:call(Pid, {subscribe, Event, Callback, [], self()}).
 
-subscribe(Pid, Event, Callback, Opts) ->
-    gen_server:call(Pid, {subscribe, Event, Callback, Opts, self()}).
+subscribe(Pid, Category, Callback, Opts) ->
+    gen_server:call(Pid, {subscribe, Category, Callback, Opts, self()}).
 
 unsubscribe(Pid, Id) ->
     gen_server:call(Pid, {unsubscribe, Id}).
@@ -106,14 +106,14 @@ code_change(_OldVsn, State, _Extra) ->
 %%%============================================================================
 %%% Internal functions
 %%%============================================================================
-do_subscribe(Event, Callback, Opts, Owner, State) ->
+do_subscribe(Category, Callback, Opts, Owner, State) ->
     #state{subscriptions = Subscriptions} = State,
     Filter = proplists:get_value(filter, Opts, none),
     OneTimeOnly = proplists:get_value(one_time_only, Opts, false),
     Timeout = proplists:get_value(timeout, Opts, infinity),
     Id = make_ref(),
-    lager:debug("Registering notification: Owner=~p, Event=~p, Callback=~p, Opts=~p", [Owner, Event, Callback, Opts]),
-    Sub = #sub{id = Id, event = Event, callback = Callback, filter = Filter, one_time_only = OneTimeOnly},
+    lager:debug("Registering notification: Owner=~p, Event=~p, Callback=~p, Opts=~p", [Owner, Category, Callback, Opts]),
+    Sub = #sub{id = Id, category = Category, callback = Callback, filter = Filter, one_time_only = OneTimeOnly},
     Sub1 = case Timeout of
                {I, Cb} when is_integer(I) ->
                    TimerRef = erlang:send_after(I, self(), {notification_timeout, Id, Cb}),
@@ -124,9 +124,12 @@ do_subscribe(Event, Callback, Opts, Owner, State) ->
                _ -> Sub
            end,
 
-    NewSubs = maps:put(Event, [Sub1 | maps:get(Event, Subscriptions, [])], Subscriptions),
+    NewSubs = maps:put(Category, [Sub1 | maps:get(Category, Subscriptions, [])], Subscriptions),
     erlang:monitor(process, Owner),
     {ok, Id, State#state{subscriptions = NewSubs}}.
+
+do_unsubscribe(undefined, State) ->
+    {ok, State};
 
 do_unsubscribe(Id, State) when is_reference(Id) ->
     #state{subscriptions = Subscriptions} = State,
@@ -139,23 +142,23 @@ do_unsubscribe(Pid, State) when is_pid(Pid) ->
     Matches = lists:filter(Fun, lists:flatten(maps:values(Subscriptions))),
     do_unsubscribe(Matches, State);
 
-do_unsubscribe([#sub{id = Id, event = Event} | Rest], State) ->
+do_unsubscribe([#sub{id = Id, category = Category} | Rest], State) ->
     #state{subscriptions = Subscriptions} = State,
     F1 = fun(#sub{id = Id2}) -> Id =/= Id2 end,
-    List = lists:filter(F1, maps:get(Event, Subscriptions, [])),
-    State1 = State#state{subscriptions = maps:put(Event, List, Subscriptions)},
+    List = lists:filter(F1, maps:get(Category, Subscriptions, [])),
+    State1 = State#state{subscriptions = maps:put(Category, List, Subscriptions)},
     do_unsubscribe(Rest, State1);
 
 do_unsubscribe([], State) ->
     {ok, State}.
 
-do_publish(Event, Data, State) ->
+do_publish(Category, Data, State) ->
     #state{subscriptions = Subscriptions} = State,
-    List = lists:filter(fun(#sub{event = Event2}) -> Event =:= Event2 end, lists:flatten(maps:values(Subscriptions))),
-    lager:debug("Publishing notification '~s'. Looking for candidates...", [Event]),
-    do_publish(Event, Data, List, State).
+    List = lists:filter(fun(#sub{category = Category2}) -> Category =:= Category2 end, lists:flatten(maps:values(Subscriptions))),
+    lager:debug("Publishing notification '~s'. Looking for candidates...", [Category]),
+    do_publish(Category, Data, List, State).
 
-do_publish(Event, Data, [Sub | Rest], State) ->
+do_publish(Category, Data, [Sub | Rest], State) ->
     #sub{id = Id, callback = Callback, filter = Filter, timer = Timer, one_time_only = Once} = Sub,
     erlang:cancel_timer(Timer),
     Self = self(),
@@ -166,7 +169,7 @@ do_publish(Event, Data, [Sub | Rest], State) ->
                 ok;
             true ->
                 try
-                    lager:debug("Found candidate for notification '~p': Id=~p, Callback=~p", [Event, Id, Callback]),
+                    lager:debug("Found candidate for notification '~p': Id=~p, Callback=~p", [Category, Id, Callback]),
                     dxl_callback:execute(Callback, Data)
                 catch
                     _ -> unsubscribe(Self, Id)
@@ -178,7 +181,7 @@ do_publish(Event, Data, [Sub | Rest], State) ->
         end
         end,
     erlang:spawn(F),
-    do_publish(Event, Data, Rest, State);
+    do_publish(Category, Data, Rest, State);
 
 do_publish(_Event, _Data, [], _State) ->
     ok.

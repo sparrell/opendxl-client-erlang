@@ -29,13 +29,13 @@
 -include("dxl.hrl").
 
 -record(state, {
-    parent :: pid(),
     gid :: binary(),
     connected = false :: true | false,
     opts = [] :: list(),
     mqttc,
     client_id = "" :: string(),
     reply_to_topic = "" :: string(),
+    client :: pid(),
     notif_man :: pid()
 }).
 
@@ -44,7 +44,7 @@
 %%%============================================================================
 start_link([GID, MqttOpts]) ->
     Name = dxl_util:module_reg_name(GID, ?MODULE),
-    gen_server:start_link({local, Name}, ?MODULE, [self(), GID, MqttOpts], []).
+    gen_server:start_link({local, Name}, ?MODULE, [GID, MqttOpts], []).
 
 is_connected(Pid) ->
     gen_server:call(Pid, is_connected).
@@ -84,17 +84,17 @@ send_event(Pid, Topic, Message) ->
 %%%============================================================================
 %%% gen_server functions
 %%%============================================================================
-init([Parent, GID, MqttOpts]) ->
+init([GID, MqttOpts]) ->
     ClientId = proplists:get_value(client_id, MqttOpts, dxl_util:generate_uuid()),
     ReplyToTopic = list_to_bitstring("/mcafee/client/" ++ ClientId),
     {ok, Conn} = emqttc:start_link(MqttOpts),
     emqttc:subscribe(Conn, ReplyToTopic),
-    State = #state{parent         = Parent,
-                   gid            = GID,
+    State = #state{gid            = GID,
                    opts           = MqttOpts,
                    mqttc          = Conn,
                    client_id      = ClientId,
                    reply_to_topic = ReplyToTopic,
+                   client         = dxl_util:module_reg_name(GID, dxlc),
                    notif_man      = dxl_util:module_reg_name(GID, dxl_notif_man)},
     {ok, State}.
 
@@ -172,22 +172,22 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({mqttc, C, connected}, #state{mqttc = C} = State) ->
-    #state{notif_man = NotifManager} = State,
+    #state{client = Client, notif_man = NotifManager} = State,
     lager:info("DXL Client ~p connected.", [C]),
-    dxl_notif_man:publish(NotifManager, connected, {connected, self()}),
+    dxl_notif_man:publish(NotifManager, connection, {connected, Client}),
     {noreply, State#state{mqttc = C, connected = true}};
 
 handle_info({mqttc, C, disconnected}, #state{mqttc = C} = State) ->
-    #state{parent = Parent, notif_man = NotifManager} = State,
-    dxl_notif_man:publish(NotifManager, disconnected, {disconnected, Parent}),
+    #state{client = Client, notif_man = NotifManager} = State,
+    dxl_notif_man:publish(NotifManager, connection, {disconnected, Client}),
     lager:info("DXL Client ~p disconnected.", [C]),
     {noreply, State#state{connected = false}};
 
 handle_info({publish, Topic, Binary}, State) ->
-    #state{parent = Parent, notif_man = NotifManager} = State,
+    #state{client = Client, notif_man = NotifManager} = State,
     Message = dxl_decoder:decode(Binary),
     dxl_util:log_dxlmessage("Inbound DXL Message", Message),
-    dxl_notif_man:publish(NotifManager, message_in, {message_in, {Topic, Message, Parent}}),
+    dxl_notif_man:publish(NotifManager, message_in, {message_in, {Topic, Message, Client}}),
     {noreply, State};
 
 handle_info(_Info, State) ->
