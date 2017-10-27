@@ -1,7 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Chris Waymire <chris@waymire.net>
 %%% @doc
-%%% The `dxlc` module is the interface into the DXL fabric, acting as a proxy
+%%% The `dxlc` module is the API  into the DXL fabric, acting as a proxy
 %%% to the various underlying modules that provide the implementation details.
 %%% @end
 %%%----------------------------------------------------------------------------

@@ -1,3 +1,13 @@
+%%%----------------------------------------------------------------------------
+%%% @author Chris Waymire <chris@waymire.net>
+%%% @doc
+%%% The dxl_conn module manages the connection to, and interactions with, the
+%%% DXL broker.
+%%%
+%%% This module is considered private and should not be accessed
+%%% directly. DXL
+%%% @end
+%%%----------------------------------------------------------------------------
 -module(dxl_conn).
 
 -behaviour(gen_server).
