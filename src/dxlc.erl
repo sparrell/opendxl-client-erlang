@@ -737,7 +737,9 @@ handle_call({get_all_active_services, ServiceType}, From, State) ->
 %%% Misc functions
 handle_call(wait_until_connected, From, State) ->
     #state{notif_man = NotifMan} = State,
-    F = fun({connected, _}) -> gen_server:reply(From, ok) end,
+    F = fun({connected, _}) -> gen_server:reply(From, ok);
+           (_) -> ok
+        end,
     dxl_notif_man:subscribe(NotifMan, connection, F),
     {noreply, State}.
 
