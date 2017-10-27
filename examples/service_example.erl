@@ -20,8 +20,8 @@ start() ->
               ok
  	  end,
 
-    ServiceRegistry = #service_registry{service_type = <<"/mycompany/myservice">>, topics=#{?SERVICE_TOPIC => Fun}},
-    lager:info("Registering service: ~s", [ServiceRegistry#service_registry.service_type]),
+    ServiceRegistry = #service_registration{type = <<"/mycompany/myservice">>, topics=#{?SERVICE_TOPIC => Fun}},
+    lager:info("Registering service: ~s", [ServiceRegistry#service_registration.type]),
     {ok, ServiceId} = dxlc:register_service(Client, ServiceRegistry, 10000), 
     lager:info("Successfully registered service: ~s", [ServiceId]),
     lager:info("Sending request to service.", []),

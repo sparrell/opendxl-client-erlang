@@ -27,6 +27,7 @@
 -define(DEF_ERR_CODE, 0).
 -define(DEF_ERR_MESSAGE, <<"">>).
 
+-define(SVC_REG_QUERY_TOPIC, <<"/mcafee/service/dxl/svcregistry/query">>).
 -define(SVC_REG_REQ_TOPIC, <<"/mcafee/service/dxl/svcregistry/register">>).
 -define(SVC_REG_TOPIC, <<"/mcafee/event/dxl/svcregistry/register">>).
 -define(DEF_SVC_REG_TIMEOUT, (60 * 2 * 1000)).
@@ -36,9 +37,11 @@
 
 -define(ADJUSTED_TIMEOUT(Timeout), (Timeout + 50)).
 
+-define(CLIENT_TOPIC_PREFIX, "/mcafee/client/").
+
 -record(dxlmessage, {
     type = request :: atom(),
-    message_id = <<"">> :: binary(),
+    message_id = dxl_util:generate_uuid() :: binary(),
     src_client_id = ?DEF_SRC_CLIENT_ID :: binary(),
     src_broker_id = ?DEF_SRC_BROKER_ID :: binary(),
     broker_ids = ?DEF_BROKER_IDS :: [binary()],

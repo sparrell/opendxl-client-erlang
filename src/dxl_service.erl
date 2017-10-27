@@ -223,7 +223,7 @@ subscribe_to_notification(Topic, Callback, NotifMan) ->
     NotifId.
 
 do_deregister(State) ->
-    #state{id = Id, type = Type} = State,
+    #state{id = Id} = State,
     lager:debug("[Service:~p] Starting service deregistration.", [Id]),
     send_deregistration_request(State),
     clear_ttl_timer(State).

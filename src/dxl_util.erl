@@ -13,7 +13,10 @@
          create_topic_filter/1,
          create_topic_filter/2,
          create_request_filter/1,
-         create_response_filter/1
+         create_response_filter/1,
+         json_bin_to_term/1,
+         term_to_json_bin/1,
+         trailing0/1
 ]).
 
 -include("dxl.hrl").
@@ -103,3 +106,18 @@ create_response_filter(#dxlmessage{} = Request) ->
        ({_, _, _}) -> false
     end.
 
+
+json_bin_to_term(JSON) ->
+    jiffy:decode(trailing0(JSON), [return_maps]).
+
+term_to_json_bin(Term) ->
+    jiffy:encode(Term).
+
+trailing0(B) when is_binary(B) ->
+    S = byte_size(B) - 1,
+    case B of
+        <<Prefix:S/bytes, 0>> -> trailing0(Prefix);
+        _ -> B
+    end;
+
+trailing0(B) -> error(badarg, [B]).

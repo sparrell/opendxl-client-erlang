@@ -35,7 +35,9 @@
          send_event/3,
          subscribe_notification/4,
          unsubscribe_notification/2,
-         is_connected/1
+         is_connected/1,
+         get_all_active_services/1,
+         get_all_active_services/2
 ]).
 
 %% gen_server callbacks
@@ -296,7 +298,7 @@ subscriptions(Pid) ->
 %%% Note that if the request times out, the call will return but the request
 %%% will still be sent but any response will be ignored.
 %%%
-%%% Returns {ok, MessageId} on success or {error, timeout} on timeout.
+%%% Returns ok on success or {error, timeout} on timeout.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_request(Pid, Topic, Message) when is_binary(Message) ->
@@ -310,7 +312,7 @@ send_request(Pid, Topic, Message) when is_binary(Message) ->
 %%% Note that if the request times out, the call will return but the request
 %%% will still be sent but any response will be ignored.
 %%%
-%%% Returns {ok, MessageId} on success or {error, timeout} on timeout.
+%%% Returns ok on success or {error, timeout} on timeout.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_request(Pid, Topic, #dxlmessage{} = Message) ->
@@ -328,7 +330,7 @@ send_request(Pid, Topic, #dxlmessage{} = Message) ->
 %%% Note that if the request times out, the call will return but the request
 %%% will still be sent but any response will be ignored.
 %%%
-%%% Returns {ok, MessageId} on success or {error, timeout} on timeout.
+%%% Returns ok on success or {error, timeout} on timeout.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_request(Pid, Topic, Payload, Timeout) when is_binary(Payload) ->
@@ -342,7 +344,7 @@ send_request(Pid, Topic, Payload, Timeout) when is_binary(Payload) ->
 %%% Note that if the request times out, the call will return but the request
 %%% will still be sent but any response will be ignored.
 %%%
-%%% Returns {ok, MessageId} on success or {error, timeout} on timeout.
+%%% Returns ok on success or {error, timeout} on timeout.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_request(Pid, Topic, #dxlmessage{} = Message, Timeout) ->
@@ -450,7 +452,7 @@ send_request_async(Pid, Topic, #dxlmessage{} = Message, Callback, Timeout) ->
 %%% @doc
 %%% Send a response to a DXL request.
 %%%
-%%% Returns {ok, MessageId}.
+%%% Returns ok.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_response(Pid, #dxlmessage{} = Request, #dxlmessage{} = Message) ->
@@ -463,7 +465,7 @@ send_response(Pid, #dxlmessage{} = Request, #dxlmessage{} = Message) ->
 %%% The binary payload provided in the Message argument is inserted into a
 %%% dxlmessage record and published onto the fabric.
 %%%
-%%% Returns {ok, MessageId}.
+%%% Returns ok.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_response(Pid, #dxlmessage{} = Request, Message) when is_binary(Message) ->
@@ -474,7 +476,7 @@ send_response(Pid, #dxlmessage{} = Request, Message) when is_binary(Message) ->
 %%% @doc
 %%% Send an error response to a DXL request.
 %%%
-%%% Returns {ok, MessageId}.
+%%% Returns ok.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_error(Pid, #dxlmessage{} = Request, #dxlmessage{} = Message) ->
@@ -487,7 +489,7 @@ send_error(Pid, #dxlmessage{} = Request, #dxlmessage{} = Message) ->
 %%% The binary payload provided in the Message argument is inserted into a
 %%% dxlmessage record and published onto the fabric.
 %%%
-%%% Returns {ok, MessageId}.
+%%% Returns ok.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_error(Pid, #dxlmessage{} = Request, Message) when is_binary(Message) ->
@@ -501,7 +503,7 @@ send_error(Pid, #dxlmessage{} = Request, Message) when is_binary(Message) ->
 %%% The binary payload provided in the Message argument is inserted into a
 %%% dxlmessage record and published onto the fabric.
 %%%
-%%% Returns {ok, MessageId}.
+%%% Returns ok.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_event(Pid, Topic, Message) when is_binary(Message) ->
@@ -511,7 +513,7 @@ send_event(Pid, Topic, Message) when is_binary(Message) ->
 %%% @doc
 %%% Publish an event onto the DXL fabric.
 %%%
-%%% Returns {ok, MessageId}.
+%%% Returns ok.
 %%% @end
 %%%----------------------------------------------------------------------------
 send_event(Pid, Topic, #dxlmessage{} = Message) ->
@@ -543,11 +545,82 @@ subscribe_notification(Pid, Category, Callback, Opts) ->
 unsubscribe_notification(Pid, NotificationId) ->
     gen_server:call(Pid, {unsubscribe_notification, NotificationId}).
 
+%%%----------------------------------------------------------------------------
+%%% @doc
+%%% Returns all of the services registered on the broker.
+%%%
+%%% e.g.
+%%%    {
+%%%      "services": {
+%%%        "1b369149-ed6e-455b-a8cf-2bbcc0e97e75": {
+%%%          "brokerGuid": "{bba830c4-826d-11e7-1280-08002731ae47}",
+%%%          "certificates": [
+%%%
+%%%          ],
+%%%          "clientGuid": "erl_dxlclient1",
+%%%          "local": true,
+%%%          "managed": true,
+%%%          "metaData": {
+%%%
+%%%          },
+%%%          "registrationTime": 1509123717,
+%%%          "requestChannels": [
+%%%            "/test/topic/foo"
+%%%          ],
+%%%          "serviceGuid": "1b369149-ed6e-455b-a8cf-2bbcc0e97e75",
+%%%          "serviceType": "foo",
+%%%          "ttlMins": 60,
+%%%          "unauthorizedChannels": [
+%%%
+%%%          ]
+%%%        },
+%%%        "dc1733fb-1178-48b9-8893-2056f413fae2": {
+%%%          "brokerGuid": "{bba830c4-826d-11e7-1280-08002731ae47}",
+%%%          "certificates": [
+%%%
+%%%          ],
+%%%          "clientGuid": "erl_dxlclient1",
+%%%          "local": true,
+%%%          "managed": true,
+%%%          "metaData": {
+%%%
+%%%          },
+%%%          "registrationTime": 1509123720,
+%%%          "requestChannels": [
+%%%            "/test/topic/bar"
+%%%          ],
+%%%          "serviceGuid": "dc1733fb-1178-48b9-8893-2056f413fae2",
+%%%          "serviceType": "bar",
+%%%          "ttlMins": 60,
+%%%          "unauthorizedChannels": [
+%%%
+%%%          ]
+%%%        }
+%%%      }
+%%%    }
+%%% @end
+%%%----------------------------------------------------------------------------
+get_all_active_services(Pid) ->
+    gen_server:call(Pid, {get_all_active_services, undefined}).
+
+%%%----------------------------------------------------------------------------
+%%% @doc
+%%% Returns all of the services registered on the broker, filtering on service type.
+%%% @end
+%%%----------------------------------------------------------------------------
+get_all_active_services(Pid, ServiceType) when is_list(ServiceType) ->
+    get_all_active_services(Pid, list_to_binary(ServiceType));
+
+get_all_active_services(Pid, ServiceType) when is_binary(ServiceType) ->
+    gen_server:call(Pid, {get_all_active_services, ServiceType}).
+
 %%%============================================================================
 %%% gen_server functions
 %%%============================================================================
 init([Parent, GID, MqttOpts]) ->
     {ok, NotifMan} = dxl_notif_man:start_link(GID),
+    dxl_notif_man:subscribe(NotifMan, connection, self()),
+
     {ok, ServiceMan} = dxl_service_man:start_link(GID),
     {ok, DxlConn} = dxl_conn:start_link([GID, MqttOpts]),
 
@@ -590,13 +663,13 @@ handle_call({send_request, Topic, Message, Timeout}, From, State) ->
 
 handle_call({send_request_async, Topic, Message}, _From, State) ->
     #state{dxl_conn = DxlConn} = State,
-    {ok, MessageId} = dxl_conn:send_request_async(DxlConn, Topic, Message),
-    {reply, {ok, MessageId}, State};
+    ok = dxl_conn:send_request_async(DxlConn, Topic, Message),
+    {reply, ok, State};
 
 handle_call({send_request_async, Topic, Message, Callback, Timeout}, _From, State) ->
     #state{dxl_conn = DxlConn} = State,
-    {ok, MessageId} = dxl_conn:send_request_async(DxlConn, Topic, Message, Callback, Timeout),
-    {reply, {ok, MessageId}, State};
+    ok = dxl_conn:send_request_async(DxlConn, Topic, Message, Callback, Timeout),
+    {reply, ok, State};
 
 handle_call({send_response, Request, Message}, _From, State) ->
     #state{dxl_conn = DxlConn} = State,
@@ -645,14 +718,20 @@ handle_call({deregister_service_async, Id, Callback, Timeout}, _From, State) ->
     dxl_service_man:deregister_service_async(ServiceMan, Id, Callback, Timeout),
     {reply, ok, State};
 
-handle_call({update_service, Id, Service, Timeout}, From, State) ->
-    #state{service_man = ServiceMan} = State,
-    dxl_service_man:update_service(ServiceMan, From, Id, Service, Timeout),
-    {noreply, State};
-
-handle_call({update_service, Id, Timeout}, From, State) ->
-    #state{service_man = ServiceMan} = State,
-    dxl_service_man:update_service(ServiceMan, From, Id, Timeout),
+handle_call({get_all_active_services, ServiceType}, From, State) ->
+    #state{dxl_conn = DxlConn} = State,
+    Payload = case ServiceType of
+                     undefined -> << "{}" >>;
+                     _ -> dxl_util:term_to_json_bin({[{serviceType, ServiceType}]})
+                 end,
+    Request = #dxlmessage{payload = Payload},
+    Callback = fun({message_in, {_, #dxlmessage{type = response} = M, _}}) ->
+                      Data = dxl_util:json_bin_to_term(M#dxlmessage.payload),
+                      gen_server:reply(From, maps:get(<<"services">>, Data));
+                  ({message_in, {_, #dxlmessage{type = error} = M, _}}) ->
+                      gen_server:reply(From, {error, M#dxlmessage.error_code, M#dxlmessage.error_message})
+               end,
+    dxl_conn:send_request_async(DxlConn, ?SVC_REG_QUERY_TOPIC, Request, Callback, 3000),
     {noreply, State};
 
 %%% Misc functions
@@ -660,23 +739,16 @@ handle_call(wait_until_connected, From, State) ->
     #state{notif_man = NotifMan} = State,
     F = fun({connected, _}) -> gen_server:reply(From, ok) end,
     dxl_notif_man:subscribe(NotifMan, connection, F),
-    {noreply, State};
-
-handle_call(Request, _From, State) ->
-    lager:debug("[~s]: Ignoring unexpected call: ~p", [?MODULE, Request]),
-    {reply, ignored, State}.
+    {noreply, State}.
 
 handle_cast(_Msg, State) ->
-    {noreply, State}.
+    {shutdown, unexpected_message, State}.
 
 handle_info({connected, _Client}, State) ->
     {noreply, State#state{connected = true}};
 
 handle_info({disconnected, _Client}, State) ->
-    {noreply, State#state{connected = false}};
-
-handle_info(_Info, State) ->
-    {noreply, State}.
+    {noreply, State#state{connected = false}}.
 
 terminate(_Reason, _State) ->
     ok.

@@ -14,7 +14,8 @@
          send_request_async/5,
          send_response/3,
          send_error/3,
-         send_event/3
+         send_event/3,
+         set_client_id/2
 ]).
 
 %% gen_server callbacks
@@ -81,6 +82,10 @@ send_error(Pid, #dxlmessage{} = Request, Message) ->
 
 send_event(Pid, Topic, Message) ->
     gen_server:call(Pid, {send_event, Topic, Message}).
+
+set_client_id(Pid, ClientId) ->
+    gen_server:call(Pid, {set_client_id, ClientId}).
+
 %%%============================================================================
 %%% gen_server functions
 %%%============================================================================
@@ -99,95 +104,88 @@ init([GID, MqttOpts]) ->
     {ok, State}.
 
 handle_call(is_connected, _From, State) ->
-    #state{mqttc = C} = State,
-    R = emqttc:is_connected(C),
-    {reply, R, State};
+    Result = do_is_connected(State),
+    {reply, Result, State};
 
 handle_call({subscribe, Topic}, _From, State) ->
-    #state{mqttc = C} = State,
-    ok = emqttc:subscribe(C, Topic),
-    {reply, ok, State};
+    Result = do_subscribe(Topic, State),
+    {reply, Result, State};
 
 handle_call({unsubscribe, Topic}, _From, State) ->
-    #state{mqttc = C} = State,
-    ok = emqttc:unsubscribe(C, Topic),
-    {reply, ok, State};
+    Result = do_unsubscribe(Topic, State),
+    {reply, Result, State};
 
 handle_call(subscriptions, _From, State) ->
-    #state{mqttc = C} = State,
-    [Topic || {Topic, _Qos} <- emqttc:topics(C)];
+    Result = do_subscriptions(State),
+    {reply, Result, State};
 
 handle_call({send_request, Topic, Message}, _From, State) ->
-    #state{reply_to_topic = ReplyToTopic} = State,
-    Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
-    {ok, MessageId} = publish(request, Topic, Message1, State),
-    {reply, {ok, MessageId}, State};
+    Result = do_send_request(Topic, Message, State),
+    {reply, Result, State};
 
 handle_call({send_request, Sender, Topic, Message, Timeout}, _From, State) ->
-    #state{reply_to_topic = ReplyToTopic, notif_man = NotifMan} = State,
-    Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
-    {ok, MessageId} = publish(request, Topic, Message1, State),
-    Callback = fun({message_in, {_, M, _}}) -> gen_server:reply(Sender, M) end,
-    Filter = dxl_util:create_response_filter(Message#dxlmessage{message_id = MessageId}),
-    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
-    {ok, _} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
-    {reply, ok, State};
+    Result = do_send_request(Sender, Topic, Message, Timeout, State),
+    {reply, Result, State};
 
 handle_call({send_request_async, Topic, Message}, _From, State) ->
-    #state{reply_to_topic = ReplyToTopic} = State,
-    Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
-    {ok, MessageId} = publish(request, Topic, Message1, State),
-    {reply, {ok, MessageId}, State};
+    Result = do_send_request_async(Topic, Message, State),
+    {reply, Result, State};
 
 handle_call({send_request_async, Topic, Message, Callback, Timeout}, _From, State) ->
-    #state{reply_to_topic = ReplyToTopic, notif_man = NotifMan} = State,
-    Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
-    {ok, MessageId} = publish(request, Topic, Message1, State),
-    Filter = dxl_util:create_response_filter(Message1#dxlmessage{message_id = MessageId}),
-    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
-    {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
-    {reply, {ok, NotifId}, State};
+    Result = do_send_request_async(Topic, Message, Callback, Timeout, State),
+    {reply, Result, State};
 
 handle_call({send_response, Request, Message}, _From, State) ->
-    #dxlmessage{reply_to_topic = ReplyToTopic} = Request,
-    Message1 = populate_response_from_request(Request, Message),
-    Result = publish(response, ReplyToTopic, Message1, State),
+    Result = do_send_response(Request, Message, State),
     {reply, Result, State};
 
 handle_call({send_error, Request, Message}, _From, State) ->
-    #dxlmessage{reply_to_topic = ReplyToTopic} = Request,
-    Message1 = populate_response_from_request(Request, Message),
-    Result = publish(error, ReplyToTopic, Message1, State),
+    Result = do_send_error(Request, Message, State),
     {reply, Result, State};
 
 handle_call({send_event, Topic, Message}, _From, State) ->
-    Result = publish(event, Topic, Message, State),
-    {reply, Result, State};
+    Result = do_send_event(Topic, Message, State),
+    {reply, Result, State}.
 
-handle_call(Request, _From, State) ->
-    lager:debug("[~s]: Ignoring unexpected call: ~p", [?MODULE, Request]),
-    {reply, ignored, State}.
+handle_cast({verify_client_id, ActiveClientId}, State) ->
+    #state{client = Client, client_id = CurrentClientId, notif_man = NotifMan} = State,
+    case CurrentClientId =:= ActiveClientId of
+        true ->
+            lager:info("Client ID has been set to ~p.", [ActiveClientId]);
+        false ->
+            lager:info("Client ID has been changed from ~p to ~p.", [CurrentClientId, ActiveClientId]),
+            do_unsubscribe(<<?CLIENT_TOPIC_PREFIX, CurrentClientId/binary>>, State)
+    end,
+
+    ClientTopic = <<?CLIENT_TOPIC_PREFIX, ActiveClientId/binary>>,
+    case lists:member(ClientTopic, do_subscriptions(State)) of
+        true -> ok;
+        false ->
+            lager:info("Subscribing to client topic: ~p.", [ClientTopic]),
+            do_subscribe(ClientTopic, State)
+    end,
+    dxl_notif_man:publish(NotifMan, connection, {connected, Client}),
+    {noreply, State#state{client_id = ActiveClientId, reply_to_topic = ClientTopic}};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({mqttc, C, connected}, #state{mqttc = C} = State) ->
-    #state{client = Client, notif_man = NotifManager} = State,
     lager:info("DXL Client ~p connected.", [C]),
-    dxl_notif_man:publish(NotifManager, connection, {connected, Client}),
+    verify_client_id(State),
     {noreply, State#state{mqttc = C, connected = true}};
 
 handle_info({mqttc, C, disconnected}, #state{mqttc = C} = State) ->
-    #state{client = Client, notif_man = NotifManager} = State,
-    dxl_notif_man:publish(NotifManager, connection, {disconnected, Client}),
+    #state{client = Client, notif_man = NotifMan} = State,
+    dxl_notif_man:publish(NotifMan, connection, {disconnected, Client}),
     lager:info("DXL Client ~p disconnected.", [C]),
     {noreply, State#state{connected = false}};
 
 handle_info({publish, Topic, Binary}, State) ->
-    #state{client = Client, notif_man = NotifManager} = State,
+    #state{client = Client, notif_man = NotifMan} = State,
     Message = dxl_decoder:decode(Binary),
     dxl_util:log_dxlmessage("Inbound DXL Message", Message),
-    dxl_notif_man:publish(NotifManager, message_in, {message_in, {Topic, Message, Client}}),
+    dxl_notif_man:publish(NotifMan, message_in, {message_in, {Topic, Message, Client}}),
     {noreply, State};
 
 handle_info(_Info, State) ->
@@ -202,17 +200,82 @@ code_change(_OldVsn, State, _Extra) ->
 %%%============================================================================
 %%% Internal functions
 %%%============================================================================
+do_is_connected(State) ->
+    #state{mqttc = C} = State,
+    R = emqttc:is_connected(C),
+    R.
+
+do_subscribe(Topic, State) ->
+    #state{mqttc = C} = State,
+    ok = emqttc:subscribe(C, Topic),
+    ok.
+
+do_unsubscribe(Topic, State) ->
+    #state{mqttc = C} = State,
+    ok = emqttc:unsubscribe(C, Topic),
+    ok.
+
+do_subscriptions(State) ->
+    #state{mqttc = C} = State,
+    [Topic || {Topic, _Qos} <- emqttc:topics(C)].
+
+do_send_request(Topic, Message, State) ->
+    #state{reply_to_topic = ReplyToTopic} = State,
+    Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
+    ok = publish(request, Topic, Message1, State).
+
+do_send_request(Sender, Topic, Message, Timeout, State) ->
+    #state{reply_to_topic = ReplyToTopic, notif_man = NotifMan} = State,
+    Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
+    Callback = fun({message_in, {_, M, _}}) -> gen_server:reply(Sender, M) end,
+    Filter = dxl_util:create_response_filter(Message),
+    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
+    {ok, _} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
+    ok = publish(request, Topic, Message1, State).
+
+do_send_request_async(Topic, Message, State) ->
+    #state{reply_to_topic = ReplyToTopic} = State,
+    Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
+    ok = publish(request, Topic, Message1, State),
+    ok.
+
+do_send_request_async(Topic, Message, Callback, Timeout, State) ->
+    #state{reply_to_topic = ReplyToTopic, notif_man = NotifMan} = State,
+    Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
+    Filter = dxl_util:create_response_filter(Message1),
+    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
+    {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
+    ok = publish(request, Topic, Message1, State),
+    {ok, NotifId}.
+
+do_send_response(Request, Message, State) ->
+    #dxlmessage{reply_to_topic = ReplyToTopic} = Request,
+    Message1 = populate_response_from_request(Request, Message),
+    publish(response, ReplyToTopic, Message1, State).
+
+do_send_error(Request, Message, State) ->
+    #dxlmessage{reply_to_topic = ReplyToTopic} = Request,
+    Message1 = populate_response_from_request(Request, Message),
+    publish(error, ReplyToTopic, Message1, State).
+
+do_send_event(Topic, Message, State) ->
+    publish(event, Topic, Message, State).
+
 populate_response_from_request(Request, Response) ->
     #dxlmessage{message_id = RequestMessageId, service_id = ServiceId} = Request,
     Response#dxlmessage{request_message_id = RequestMessageId, service_id = ServiceId}.
 
 publish(Type, Topic, Message, State) ->
-    #state{mqttc = C, client_id = ClientId} = State,
-    MessageId = dxl_util:generate_uuid(),
-    Message1 = Message#dxlmessage{type = Type, message_id = MessageId, src_client_id = ClientId},
+    #state{mqttc = C, client_id = ClientId, reply_to_topic = ReplyToTopic} = State,
+    Message1 = Message#dxlmessage{type = Type, src_client_id = ClientId, reply_to_topic = ReplyToTopic},
     Encoded = dxl_encoder:encode(Message1),
-    %% {ok, MsgId} or {error, timeout}
     dxl_util:log_dxlmessage("Outbound DXL Message", Message1),
     ok = emqttc:publish(C, Topic, Encoded),
-    {ok, MessageId}.
+    ok.
+
+verify_client_id(State) ->
+    BadTopic = list_to_bitstring("/bad/topic/" ++ dxl_util:generate_uuid()),
+    Self = self(),
+    Callback = fun({message_in, {_, #dxlmessage{client_ids = [ClientId | _]}, _}}) -> gen_server:cast(Self, {verify_client_id, ClientId}) end,
+    do_send_request_async(BadTopic, #dxlmessage{}, Callback, 3000, State).
 
