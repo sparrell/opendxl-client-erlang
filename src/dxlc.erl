@@ -10,7 +10,8 @@
 -behaviour(gen_server).
 
 -export([start/1,
-         start_async/1
+         start_async/1,
+         stop/1
 ]).
 
 -export([register_service/2,
@@ -86,6 +87,15 @@ start(Opts) ->
         Other ->
             Other
     end.
+
+-spec stop(Pid :: pid()) -> ok.
+%%%----------------------------------------------------------------------------
+%%% @doc
+%%% Stops the DXL client.
+%%% @end
+%%%----------------------------------------------------------------------------
+stop(Pid) ->
+    gen_server:call(Pid, stop).
 
 -spec start_async(Opts :: list()) -> {ok, Pid :: pid()} | {error, Error :: term()}.
 %%%----------------------------------------------------------------------------
@@ -733,6 +743,9 @@ handle_call({get_all_active_services, ServiceType}, From, State) ->
                end,
     dxl_conn:send_request_async(DxlConn, ?SVC_REG_QUERY_TOPIC, Request, Callback, 3000),
     {noreply, State};
+
+handle_call(stop, _From, State) ->
+    {stop, normal, State};
 
 %%% Misc functions
 handle_call(wait_until_connected, From, State) ->
