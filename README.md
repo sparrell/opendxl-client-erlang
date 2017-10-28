@@ -72,13 +72,49 @@ $ rebar3 compile
 Connect to DXL Broker:
 
 ```erlang
+%% with config file
 {ok, Config} = dxl_client_conf:read_from_file(<<"/path/to/config">>)
 {ok, Client} = dxlc:start(Config)
+```
+```erlang
+%% without confifg file
 
-%% with name 'emqttclient'
-{ok, C2} = emqttc:start_link(emqttclient, [{host, "t.emqtt.io"}]).
+Config = [{client_id, <<"my-client-id">>},
+          {brokers, {"127.0.0.1", 8883}},
+          {keepalive, 60 * 30},
+          {ssl, [{cacertfile, <<"/path/to/cacertfile">>},
+                 {certfile, <<"/path/to/certfile">>},
+                 {keyfile, <<"/path/to/privatekey">>}]},
+          {reconnect, {1, 60, 5}}],
+
+{ok, Client} = dxlc:start(Config)
 
 ```
+
+### Connect Options
+
+```erlang
+
+-type dxlc_opt() ::   {brokers, [{inet:ip_address() | string(), inet:port_number()}]}
+                    | {client_id, binary()}
+                    | {keepalive, non_neg_integer()}
+                    | {reconnect, non_neg_integer() | {non_neg_integer(), non_neg_integer()} | false}
+                    | ssl | {ssl, [dxl_sslopt()]}.
+                  
+
+-type dxl_sslopt() :: {cacertfile, binary()}
+                    | {certfile, binary()}
+                    | {keyfile, binary()}.
+```
+
+Option | Value | Default | Description | Example
+-------|-------|---------|-------------|---------
+brokers | list(tuple()) | {"localhost", 1883} | List of brokers | {"localhost", 1883}
+client_id | binary() | random clientId | DXL ClientId | <<"slimpleClientId">>
+keepalive | non_neg_integer() | 60 | MQTT KeepAlive(secs) 
+ssl | list(dxl_sslopt()) | [] | SSL Options | [{certfile, "path/to/ssl.crt"}, {keyfile,  "path/to/ssl.key"}]}]
+reconnect | tuple() | {1, 60, 5} | Client Reconnect | {1, 60, 5}
+
 
 ## Bugs and Feedback
 
