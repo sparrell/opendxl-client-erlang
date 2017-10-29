@@ -22,16 +22,16 @@ read_from_file(Filename) ->
             LogLevel = binary_to_atom(get_value('General', 'LogLevel', Config, <<"info">>), utf8),
 
 	    {ok, [{client_id, ClientId},
-             	  {hosts, Hosts},
-             	  {keepalive, KeepAlive},
-             	  {ssl, [
-                    {cacertfile, BrokerCertChain},
-                    {certfile, CertFile},
-                    {keyfile, PrivateKey}
-                  ]},
-                  {reconnect, {ReconnDelayMin, ReconnDelayMax, ConnectRetries}},
-                  {logger, {lager, LogLevel}},
-                  auto_resub]};
+              {brokers, Hosts},
+              {keepalive, KeepAlive},
+              {ssl, [
+                  {cacertfile, BrokerCertChain},
+                  {certfile, CertFile},
+                  {keyfile, PrivateKey}
+              ]},
+              {reconnect, {ReconnDelayMin, ReconnDelayMax, ConnectRetries}},
+              {logger, {lager, LogLevel}},
+              auto_resub]};
         Error ->
             Error
     end.

@@ -28,7 +28,7 @@ start() ->
     ok.
 
 process_response(#dxlmessage{type = response, payload = Payload}) ->
-    lager:info("Response: ~p.", [dxl_util:json_bin_to_term(Payload)]);
+    lager:info("Response: ~p.", [dxl_util:json_bin_to_term(Payload]);
 
 process_response(#dxlmessage{type = error, error_code = ErrCode, error_message = ErrMsg}) ->
     lager:info("Error: ~p (~p).", [ErrMsg, ErrCode]).

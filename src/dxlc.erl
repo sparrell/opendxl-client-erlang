@@ -1,7 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Chris Waymire <chris@waymire.net>
 %%% @doc
-%%% The `dxlc` module is the API  into the DXL fabric, acting as a proxy
+%%% The dxlc module is the API  into the DXL fabric, acting as a proxy
 %%% to the various underlying modules that provide the implementation details.
 %%% @end
 %%%----------------------------------------------------------------------------
@@ -51,6 +51,16 @@
 ]).
 
 -include("dxl.hrl").
+
+-type dxl_sslopt() :: {cacertfile, binary()}
+                    | {certfile, binary()}
+                    | {keyfile, binary()}.
+
+-type dxlc_opt() :: {brokers, [{inet:ip_address() | string(), inet:port_number()}]}
+                  | {client_id, binary()}
+                  | {keepalive, non_neg_integer()}
+                  | ssl | {ssl, [dxl_sslopt()]}
+                  | {reconnect, non_neg_integer() | {non_neg_integer(), non_neg_integer()} | false}.
 
 -record(state, {
     parent :: pid(),
@@ -627,12 +637,15 @@ get_all_active_services(Pid, ServiceType) when is_binary(ServiceType) ->
 %%%============================================================================
 %%% gen_server functions
 %%%============================================================================
-init([Parent, GID, MqttOpts]) ->
+init([Parent, GID, Opts]) ->
     {ok, NotifMan} = dxl_notif_man:start_link(GID),
     dxl_notif_man:subscribe(NotifMan, connection, self()),
 
+    lager:info("OPTS (before): ~p.", [Opts]),
+    lager:info("OPTS (after): ~p.", [init_opts(Opts)]),
+
     {ok, ServiceMan} = dxl_service_man:start_link(GID),
-    {ok, DxlConn} = dxl_conn:start_link([GID, MqttOpts]),
+    {ok, DxlConn} = dxl_conn:start_link([GID, init_opts(Opts)]),
 
     {ok, #state{parent      = Parent,
                 dxl_conn    = DxlConn,
@@ -774,3 +787,61 @@ code_change(_OldVsn, State, _Extra) ->
 %%%============================================================================
 %%% Internal functions
 %%%============================================================================
+
+init_opts(Opts) ->
+    init_opts(Opts, [{client_id, dxl_util:generate_uuid()},
+                     {keepalive, 30 * 60},
+                     {reconnect, {1, 60, 5}},
+                     {logger, {lager, info}},
+                     auto_resub]).
+
+init_opts([], Config) ->
+    Config;
+
+init_opts([{client_id, ClientId} | Opts], Config) ->
+    init_opts(Opts, [{client_id, ClientId} | proplists:delete(client_id, Config)]);
+
+init_opts([{brokers, Brokers} | Opts], Config) ->
+    init_opts(Opts, [{hosts, init_opts_brokers(Brokers)} | proplists:delete(hosts, Config)]);
+
+init_opts([{keepalive, KeepAlive} | Opts], Config) ->
+    init_opts(Opts, [{keepalive, KeepAlive} | proplists:delete(keepalive, Config)]);
+
+init_opts([{reconnect, {DelayMin, DelayMax, MaxRetries}} | Opts], Config) ->
+    init_opts(Opts, [{reconnect, {DelayMin, DelayMax, MaxRetries}} | proplists:delete(reconnect, Config)]);
+
+init_opts([{ssl, SslOpts} | Opts], Config) ->
+    init_opts(Opts, [{ssl, init_opts_ssl(SslOpts)} | proplists:delete(ssl, Config)]);
+
+init_opts([_Opt | Opts], Config) ->
+    init_opts(Opts, Config).
+
+init_opts_brokers(BrokerOpts) ->
+    init_opts_brokers(BrokerOpts, []).
+
+init_opts_brokers([], Brokers) ->
+    Brokers;
+
+init_opts_brokers([{Host, Port} | BrokerOpts], Brokers) when is_list(Host), is_integer(Port) ->
+    init_opts_brokers(BrokerOpts, [{Host, Port} | Brokers]);
+
+init_opts_brokers([_Broker | BrokerOpts], Brokers) ->
+    init_opts_brokers(BrokerOpts, Brokers).
+
+init_opts_ssl(SslOpts) ->
+    init_opts_ssl(SslOpts, []).
+
+init_opts_ssl([], SslConfig) ->
+    SslConfig;
+
+init_opts_ssl([{cacertfile, CaCertFile} | SslOpts], SslConfig) ->
+    init_opts_ssl(SslOpts, [{cacertfile, CaCertFile} | SslConfig]);
+
+init_opts_ssl([{certfile, CertFile} | SslOpts], SslConfig) ->
+    init_opts_ssl(SslOpts, [{certfile, CertFile} | SslConfig]);
+
+init_opts_ssl([{keyfile, KeyFile} | SslOpts], SslConfig) ->
+    init_opts_ssl(SslOpts, [{keyfile, KeyFile} | SslConfig]);
+
+init_opts_ssl([_ | SslOpts], SslConfig) ->
+    init_opts_ssl(SslOpts, SslConfig).

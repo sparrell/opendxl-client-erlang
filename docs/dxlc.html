@@ -1,0 +1,477 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module dxlc</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module dxlc</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+   The dxlc module is the API  into the DXL fabric, acting as a proxy
+   to the various underlying modules that provide the implementation details.
+
+<p><b>Behaviours:</b> <a href="gen_server.html"><tt>gen_server</tt></a>.</p>
+<p><b>Authors:</b> Chris Waymire (<a href="mailto:chris@waymire.net"><tt>chris@waymire.net</tt></a>).</p>
+
+<h2><a name="description">Description</a></h2>
+   The dxlc module is the API  into the DXL fabric, acting as a proxy
+   to the various underlying modules that provide the implementation details.
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#code_change-3">code_change/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#deregister_service-2">deregister_service/2</a></td><td>   
+Unregister a service from the DXL fabric, waiting for the default service   
+registration timeout interval before abandoning the attempt.</td></tr>
+<tr><td valign="top"><a href="#deregister_service-3">deregister_service/3</a></td><td>   
+Unregister a service from the DXL fabric, waiting for the specified Timeout   
+interval before abandoning the attempt.</td></tr>
+<tr><td valign="top"><a href="#deregister_service_async-2">deregister_service_async/2</a></td><td>   
+Unregister a service from the DXL fabric, waiting for the default service   
+registration timeout interval before abandoning the attempt.</td></tr>
+<tr><td valign="top"><a href="#deregister_service_async-4">deregister_service_async/4</a></td><td>   
+Unregister a service from the DXL fabric, waiting for the specified timeout   
+interval before abandoning the attempt.</td></tr>
+<tr><td valign="top"><a href="#get_all_active_services-1">get_all_active_services/1</a></td><td>   
+Returns all of the services registered on the broker.</td></tr>
+<tr><td valign="top"><a href="#get_all_active_services-2">get_all_active_services/2</a></td><td>
+   Returns all of the services registered on the broker, filtering on service type.</td></tr>
+<tr><td valign="top"><a href="#handle_call-3">handle_call/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#handle_cast-2">handle_cast/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#handle_info-2">handle_info/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#init-1">init/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#is_connected-1">is_connected/1</a></td><td>   
+Returns whether the client is currently connected to a broker.</td></tr>
+<tr><td valign="top"><a href="#register_service-2">register_service/2</a></td><td>   
+Register a service with the DXL fabric, waiting the default timeout interval   
+before abandoning the attempt.</td></tr>
+<tr><td valign="top"><a href="#register_service-3">register_service/3</a></td><td>   
+Register a service with the DXL fabric, waiting the specified timeout interval   
+before abandoning the attempt.</td></tr>
+<tr><td valign="top"><a href="#register_service_async-2">register_service_async/2</a></td><td>   
+Register a service with the DXL fabric, waiting the specified Timeout   
+interval before abandoning the attempt.</td></tr>
+<tr><td valign="top"><a href="#register_service_async-4">register_service_async/4</a></td><td>   
+Register a service with the DXL fabric, waiting the specified Timeout   
+interval before abandoning the attempt.</td></tr>
+<tr><td valign="top"><a href="#send_error-3">send_error/3</a></td><td>   
+Send an error response to a DXL request.</td></tr>
+<tr><td valign="top"><a href="#send_event-3">send_event/3</a></td><td>   
+Publish an event onto the DXL fabric.</td></tr>
+<tr><td valign="top"><a href="#send_request-3">send_request/3</a></td><td>   
+Send a DXL request message to the specified topic, blocking until complete   
+or until the default request timeout interval has passed.</td></tr>
+<tr><td valign="top"><a href="#send_request-4">send_request/4</a></td><td>   
+Send a DXL request message to the specified topic, blocking until complete   
+or until the Timeout interval has passed.</td></tr>
+<tr><td valign="top"><a href="#send_request_async-3">send_request_async/3</a></td><td>   
+Send a DXL request message to the specified topic.</td></tr>
+<tr><td valign="top"><a href="#send_request_async-4">send_request_async/4</a></td><td>   
+Send a DXL request message to the specified topic.</td></tr>
+<tr><td valign="top"><a href="#send_request_async-5">send_request_async/5</a></td><td>   
+Send a DXL request message to the specified topic.</td></tr>
+<tr><td valign="top"><a href="#send_response-3">send_response/3</a></td><td>   
+Send a response to a DXL request.</td></tr>
+<tr><td valign="top"><a href="#start-1">start/1</a></td><td>   
+Starts the DXL client and attempts to connect to the fabric.</td></tr>
+<tr><td valign="top"><a href="#start_async-1">start_async/1</a></td><td>   
+Starts the DXL client and attempts to connect to the fabric.</td></tr>
+<tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>
+   Stops the DXL client.</td></tr>
+<tr><td valign="top"><a href="#subscribe-2">subscribe/2</a></td><td>   
+Subscribe to the provided DXL topic without registering a callback handler.</td></tr>
+<tr><td valign="top"><a href="#subscribe-3">subscribe/3</a></td><td>
+   Subscribe to the provided DXL topic and register the provided Callback to
+   receive messages for the topic.</td></tr>
+<tr><td valign="top"><a href="#subscribe_notification-4">subscribe_notification/4</a></td><td></td></tr>
+<tr><td valign="top"><a href="#subscriptions-1">subscriptions/1</a></td><td>
+   Return a list of all topics subscribed to.</td></tr>
+<tr><td valign="top"><a href="#terminate-2">terminate/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#unsubscribe-2">unsubscribe/2</a></td><td>
+   Unsubscribe from the provided DXL topic.</td></tr>
+<tr><td valign="top"><a href="#unsubscribe_notification-2">unsubscribe_notification/2</a></td><td>
+   Remove a previously subscribed notification by its ID.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="code_change-3">code_change/3</a></h3>
+<div class="spec">
+<p><tt>code_change(OldVsn, State, Extra) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="deregister_service-2">deregister_service/2</a></h3>
+<div class="spec">
+<p><tt>deregister_service(Pid::pid(), Id::<a href="#type-service_id">service_id()</a>) -&gt; ok | {error, Error::term()}</tt><br></p>
+</div><p><p>   
+Unregister a service from the DXL fabric, waiting for the default service   
+registration timeout interval before abandoning the attempt.</p>
+  
+   <p>This call will block until completed.</p>
+  
+   Returns ok on success, or {error, unknown_service} if an unknown service ID
+   is provided.</p>
+
+<h3 class="function"><a name="deregister_service-3">deregister_service/3</a></h3>
+<div class="spec">
+<p><tt>deregister_service(Pid::pid(), Id::<a href="#type-service_id">service_id()</a>, Timeout::integer()) -&gt; {ok, ServiceId::service_id} | {error, Error::term()}</tt><br></p>
+</div><p><p>   
+Unregister a service from the DXL fabric, waiting for the specified Timeout   
+interval before abandoning the attempt.</p>
+  
+   <p>This call will block until completed.</p>
+  
+   Returns ok on success, or {error, unknown_service} if an unknown service ID
+   is provided.</p>
+
+<h3 class="function"><a name="deregister_service_async-2">deregister_service_async/2</a></h3>
+<div class="spec">
+<p><tt>deregister_service_async(Pid::pid(), Id::<a href="#type-service_id">service_id()</a>) -&gt; ok | {error, Reason::term()}</tt><br></p>
+</div><p><p>   
+Unregister a service from the DXL fabric, waiting for the default service   
+registration timeout interval before abandoning the attempt.</p>
+  
+   <p>This call will return immediately and as no callback is provided, the   
+result of the request will not be known. If the result is needed then   
+either use the deregister_service_async function that accepts a callback   
+or manually subscribe to service notifications.</p>
+  
+   e.g. Filter = fun({_, ServiceId, _}) -&gt; ServiceId =:= Id end,
+        Callback = fun({service_unregistered, Id, Type}) -&gt; do_something;
+                      ({service_unregistration_failed, Id, Type, Reason}) -&gt; uh_oh
+                   end,
+        Opts = [{filter, Filter}, {one_time_only, true}],
+        {ok, NotifId} = dxlc:subscribe_notification(Pid, service, Callback, Opts)</p>
+
+<h3 class="function"><a name="deregister_service_async-4">deregister_service_async/4</a></h3>
+<div class="spec">
+<p><tt>deregister_service_async(Pid::pid(), Id::<a href="#type-service_id">service_id()</a>, Callback::<a href="#type-callback">callback()</a>, Timeout::integer()) -&gt; ok | {error, Reason::term()}</tt><br></p>
+</div><p><p>   
+Unregister a service from the DXL fabric, waiting for the specified timeout   
+interval before abandoning the attempt.</p>
+  
+   This call will return immediately and the result of the request will sent
+   to the provided Callback.</p>
+
+<h3 class="function"><a name="get_all_active_services-1">get_all_active_services/1</a></h3>
+<div class="spec">
+<p><tt>get_all_active_services(Pid) -&gt; any()</tt></p>
+</div><p><p>   
+Returns all of the services registered on the broker.</p>
+  
+   <p>e.g.      
+{        
+"services": {          
+"1b369149-ed6e-455b-a8cf-2bbcc0e97e75": {            
+"brokerGuid": "{bba830c4-826d-11e7-1280-08002731ae47}",            
+"certificates": [</p>
+  
+            <p>],            
+"clientGuid": "erl_dxlclient1",            
+"local": true,            
+"managed": true,            
+"metaData": {</p>
+  
+            <p>},            
+"registrationTime": 1509123717,            
+"requestChannels": [              
+"/test/topic/foo"            
+],            
+"serviceGuid": "1b369149-ed6e-455b-a8cf-2bbcc0e97e75",            
+"serviceType": "foo",            
+"ttlMins": 60,            
+"unauthorizedChannels": [</p>
+  
+            <p>]          
+},          
+"dc1733fb-1178-48b9-8893-2056f413fae2": {            
+"brokerGuid": "{bba830c4-826d-11e7-1280-08002731ae47}",            
+"certificates": [</p>
+  
+            <p>],            
+"clientGuid": "erl_dxlclient1",            
+"local": true,            
+"managed": true,            
+"metaData": {</p>
+  
+            <p>},            
+"registrationTime": 1509123720,            
+"requestChannels": [              
+"/test/topic/bar"            
+],            
+"serviceGuid": "dc1733fb-1178-48b9-8893-2056f413fae2",            
+"serviceType": "bar",            
+"ttlMins": 60,            
+"unauthorizedChannels": [</p>
+  
+            ]
+          }
+        }
+      }</p>
+
+<h3 class="function"><a name="get_all_active_services-2">get_all_active_services/2</a></h3>
+<div class="spec">
+<p><tt>get_all_active_services(Pid, ServiceType) -&gt; any()</tt></p>
+</div><p>
+   Returns all of the services registered on the broker, filtering on service type.</p>
+
+<h3 class="function"><a name="handle_call-3">handle_call/3</a></h3>
+<div class="spec">
+<p><tt>handle_call(X1, From, State) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="handle_cast-2">handle_cast/2</a></h3>
+<div class="spec">
+<p><tt>handle_cast(Msg, State) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="handle_info-2">handle_info/2</a></h3>
+<div class="spec">
+<p><tt>handle_info(X1, State) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="init-1">init/1</a></h3>
+<div class="spec">
+<p><tt>init(X1) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="is_connected-1">is_connected/1</a></h3>
+<div class="spec">
+<p><tt>is_connected(Pid::pid()) -&gt; {true, Host::string()} | false</tt><br></p>
+</div><p><p>   
+Returns whether the client is currently connected to a broker.</p>
+  
+   Returns {true, Host} if connected, or false if not connected.</p>
+
+<h3 class="function"><a name="register_service-2">register_service/2</a></h3>
+<div class="spec">
+<p><tt>register_service(Pid::pid(), Service::<a href="#type-service_registration">service_registration()</a>) -&gt; {ok, ServiceId::binary()} | {error, Error::term()}</tt><br></p>
+</div><p><p>   
+Register a service with the DXL fabric, waiting the default timeout interval   
+before abandoning the attempt.</p>
+  
+   <p>This call will block until it the registration succeeds, fails or times out.</p>
+  
+   Returns {ok, ServiceId} on success, or {error, Reason} on failure.</p>
+
+<h3 class="function"><a name="register_service-3">register_service/3</a></h3>
+<div class="spec">
+<p><tt>register_service(Pid::pid(), Service::<a href="#type-service_registration">service_registration()</a>, Timeout::integer()) -&gt; {ok, ServiceId::binary()} | {error, Error::term()}</tt><br></p>
+</div><p><p>   
+Register a service with the DXL fabric, waiting the specified timeout interval   
+before abandoning the attempt.</p>
+  
+   <p>This call will block until it the registration succeeds, fails or times out.</p>
+  
+   Returns {ok, ServiceId} on success, or {error, Reason} on failure.</p>
+
+<h3 class="function"><a name="register_service_async-2">register_service_async/2</a></h3>
+<div class="spec">
+<p><tt>register_service_async(Pid::pid(), Service::<a href="#type-service_registration">service_registration()</a>) -&gt; {ok, ServiceId::<a href="#type-service_id">service_id()</a>}</tt><br></p>
+</div><p><p>   
+Register a service with the DXL fabric, waiting the specified Timeout   
+interval before abandoning the attempt.</p>
+  
+   <p>This call will return immediately without waiting for the result of the   
+registration. If confirmation is needed you can use the function that   
+accepts a callback.</p>
+  
+   <p>e.g. register_service_async(Pid, Service, Callback, Timeout)</p>
+  
+   Returns {ok, ServiceId} on success, or {error, Reason} on failure.</p>
+
+<h3 class="function"><a name="register_service_async-4">register_service_async/4</a></h3>
+<div class="spec">
+<p><tt>register_service_async(Pid::pid(), Service::<a href="#type-service_registration">service_registration()</a>, Callback::<a href="#type-callback">callback()</a>, Timeout::integer()) -&gt; {ok, ServiceId::<a href="#type-service_id">service_id()</a>}</tt><br></p>
+</div><p><p>   
+Register a service with the DXL fabric, waiting the specified Timeout   
+interval before abandoning the attempt.</p>
+  
+   <p>This call will return immediately. The result of the registration will   
+be passed to the provided Callback as a tuple tagged with either   
+'service_registered' or 'service_registration_failed'.</p>
+  
+   <p>e.g. fun({service_registered, ServiceId, ServiceType}) -&gt; ok;           
+({service_registration_failed, ServiceId, ServiceType, Reason}) -&gt; ok        
+end.</p>
+  
+   Returns {ok, ServiceId} on success, or {error, Reason} on failure.</p>
+
+<h3 class="function"><a name="send_error-3">send_error/3</a></h3>
+<div class="spec">
+<p><tt>send_error(Pid::pid(), Request::<a href="#type-dxlmessage">dxlmessage()</a>, Message::<a href="#type-payload">payload()</a> | <a href="#type-dxlmessage">dxlmessage()</a>) -&gt; {ok, MessageId::binary()}</tt><br></p>
+</div><p><p>   
+Send an error response to a DXL request.</p>
+  
+   Returns ok.</p>
+
+<h3 class="function"><a name="send_event-3">send_event/3</a></h3>
+<div class="spec">
+<p><tt>send_event(Pid::pid(), Request::<a href="#type-dxlmessage">dxlmessage()</a>, Message::<a href="#type-payload">payload()</a> | <a href="#type-dxlmessage">dxlmessage()</a>) -&gt; {ok, MessageId::binary()}</tt><br></p>
+</div><p><p>   
+Publish an event onto the DXL fabric.</p>
+  
+   <p>The binary payload provided in the Message argument is inserted into a   
+dxlmessage record and published onto the fabric.</p>
+  
+   Returns ok.</p>
+
+<h3 class="function"><a name="send_request-3">send_request/3</a></h3>
+<div class="spec">
+<p><tt>send_request(Pid::pid(), Topic::<a href="#type-topic">topic()</a>, MessageOut::<a href="#type-payload">payload()</a> | <a href="#type-dxlmessage">dxlmessage()</a>) -&gt; MessageIn::<a href="#type-dxlmessage">dxlmessage()</a> | {error, Reason::term()}</tt><br></p>
+</div><p><p>   
+Send a DXL request message to the specified topic, blocking until complete   
+or until the default request timeout interval has passed.</p>
+  
+   <p>The binary payload provided in the Message argument is inserted into a   
+dxlmessage record and published onto the fabric.</p>
+  
+   <p>Note that if the request times out, the call will return but the request   
+will still be sent but any response will be ignored.</p>
+  
+   Returns ok on success or {error, timeout} on timeout.</p>
+
+<h3 class="function"><a name="send_request-4">send_request/4</a></h3>
+<div class="spec">
+<p><tt>send_request(Pid::pid(), Topic::<a href="#type-topic">topic()</a>, MessageOut::<a href="#type-payload">payload()</a> | <a href="#type-dxlmessage">dxlmessage()</a>, Timeout::integer()) -&gt; MessageIn::<a href="#type-dxlmessage">dxlmessage()</a> | {error, Reason::term()}</tt><br></p>
+</div><p><p>   
+Send a DXL request message to the specified topic, blocking until complete   
+or until the Timeout interval has passed.</p>
+  
+   <p>The binary payload provided in the Message argument is inserted into a   
+dxlmessage record and published onto the fabric.</p>
+  
+   <p>Note that if the request times out, the call will return but the request   
+will still be sent but any response will be ignored.</p>
+  
+   Returns ok on success or {error, timeout} on timeout.</p>
+
+<h3 class="function"><a name="send_request_async-3">send_request_async/3</a></h3>
+<div class="spec">
+<p><tt>send_request_async(Pid::pid(), Topic::<a href="#type-topic">topic()</a>, MessageOut::<a href="#type-payload">payload()</a> | <a href="#type-dxlmessage">dxlmessage()</a>) -&gt; MessageIn::<a href="#type-dxlmessage">dxlmessage()</a> | {error, Reason::term()}</tt><br></p>
+</div><p><p>   
+Send a DXL request message to the specified topic.</p>
+  
+   <p>The binary payload provided in the Message argument is inserted into a   
+dxlmessage record and published onto the fabric.</p>
+  
+   <p>This call will return immediately without waiting for a response.</p>
+  
+   This function would typically be used in situations where you
+   want to issue a request but do not care what the response is.</p>
+
+<h3 class="function"><a name="send_request_async-4">send_request_async/4</a></h3>
+<div class="spec">
+<p><tt>send_request_async(Pid::pid(), Topic::<a href="#type-topic">topic()</a>, MessageOut::<a href="#type-payload">payload()</a> | <a href="#type-dxlmessage">dxlmessage()</a>, Callback::<a href="#type-callback">callback()</a>) -&gt; MessageIn::<a href="#type-dxlmessage">dxlmessage()</a> | {error, Reason::term()}</tt><br></p>
+</div><p><p>   
+Send a DXL request message to the specified topic.</p>
+  
+   <p>The binary payload provided in the Message argument is inserted into a   
+dxlmessage record and published onto the fabric.</p>
+  
+   This call will return immediately without waiting for a response.
+  </p>
+
+<h3 class="function"><a name="send_request_async-5">send_request_async/5</a></h3>
+<div class="spec">
+<p><tt>send_request_async(Pid::pid(), Topic::<a href="#type-topic">topic()</a>, MessageOut::<a href="#type-payload">payload()</a> | <a href="#type-dxlmessage">dxlmessage()</a>, Callback::<a href="#type-callback">callback()</a>, Timeout::integer()) -&gt; MessageIn::<a href="#type-dxlmessage">dxlmessage()</a> | {error, Reason::term()}</tt><br></p>
+</div><p><p>   
+Send a DXL request message to the specified topic.</p>
+  
+   <p>The binary payload provided in the Message argument is inserted into a   
+dxlmessage record and published onto the fabric.</p>
+  
+   <p>This call will return immediately without waiting for a response.   
+Any response received within the timeout interval will be sent to   
+the provided callback. If the timeout interval expires with no   
+response then any later response is ignored.</p>
+  
+   The response to the request will be passed to the Callback provided.
+   e.g. fun({Topic, Message, Client}) -&gt; process_message(Message) end.</p>
+
+<h3 class="function"><a name="send_response-3">send_response/3</a></h3>
+<div class="spec">
+<p><tt>send_response(Pid::pid(), Request::<a href="#type-dxlmessage">dxlmessage()</a>, Message::<a href="#type-payload">payload()</a> | <a href="#type-dxlmessage">dxlmessage()</a>) -&gt; {ok, MessageId::binary()}</tt><br></p>
+</div><p><p>   
+Send a response to a DXL request.</p>
+  
+   Returns ok.</p>
+
+<h3 class="function"><a name="start-1">start/1</a></h3>
+<div class="spec">
+<p><tt>start(Opts::list()) -&gt; {ok, Pid::pid()} | {error, Error::term()}</tt><br></p>
+</div><p><p>   
+Starts the DXL client and attempts to connect to the fabric.   
+Blocks until connection is successful or fails.</p>
+  
+   Returns {ok, Pid} on success, {error, Reason} on failure.</p>
+
+<h3 class="function"><a name="start_async-1">start_async/1</a></h3>
+<div class="spec">
+<p><tt>start_async(Opts::list()) -&gt; {ok, Pid::pid()} | {error, Error::term()}</tt><br></p>
+</div><p><p>   
+Starts the DXL client and attempts to connect to the fabric.   
+Returns immediately without waiting to verify the connection is established.</p>
+  
+   Returns {ok, Pid} on success, {error, Reason} on failure.</p>
+
+<h3 class="function"><a name="stop-1">stop/1</a></h3>
+<div class="spec">
+<p><tt>stop(Pid::pid()) -&gt; ok</tt><br></p>
+</div><p>
+   Stops the DXL client.</p>
+
+<h3 class="function"><a name="subscribe-2">subscribe/2</a></h3>
+<div class="spec">
+<p><tt>subscribe(Pid::pid(), Topic::<a href="#type-topic">topic()</a>) -&gt; ok</tt><br></p>
+</div><p><p>   
+Subscribe to the provided DXL topic without registering a callback handler.   
+In order to receive messages on this topic a handler will need to be   
+registered with the notification system on the message_in category.</p>
+  
+   e.g. Filter = dxl_util:create_topic_filter(TopicToSubTo),
+        Callback = fun({Topic, Message, Client}) -&gt; process_message(Message) end,
+        {ok, NotifId} = dxlc:subscribe_notification(Pid, message_in, Callback,</p>
+
+<h3 class="function"><a name="subscribe-3">subscribe/3</a></h3>
+<div class="spec">
+<p><tt>subscribe(Pid::pid(), Topic::<a href="#type-topic">topic()</a>, Callback::<a href="#type-callback">callback()</a>) -&gt; {ok, NotificationId::reference()}</tt><br></p>
+</div><p>
+   Subscribe to the provided DXL topic and register the provided Callback to
+   receive messages for the topic.</p>
+
+<h3 class="function"><a name="subscribe_notification-4">subscribe_notification/4</a></h3>
+<div class="spec">
+<p><tt>subscribe_notification(Pid::pid(), Event::atom(), Callback::<a href="#type-callback">callback()</a>, Opts::list()) -&gt; {ok, NotificationId::binary()}</tt><br></p>
+</div>
+
+<h3 class="function"><a name="subscriptions-1">subscriptions/1</a></h3>
+<div class="spec">
+<p><tt>subscriptions(Pid::pid()) -&gt; [<a href="#type-topic">topic()</a>]</tt><br></p>
+</div><p>
+   Return a list of all topics subscribed to.</p>
+
+<h3 class="function"><a name="terminate-2">terminate/2</a></h3>
+<div class="spec">
+<p><tt>terminate(Reason, State) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="unsubscribe-2">unsubscribe/2</a></h3>
+<div class="spec">
+<p><tt>unsubscribe(Pid::pid(), Topic::<a href="#type-topic">topic()</a>) -&gt; ok</tt><br></p>
+</div><p>
+   Unsubscribe from the provided DXL topic.</p>
+
+<h3 class="function"><a name="unsubscribe_notification-2">unsubscribe_notification/2</a></h3>
+<div class="spec">
+<p><tt>unsubscribe_notification(Pid::pid(), NotificationId::binary()) -&gt; ok</tt><br></p>
+</div><p>
+   Remove a previously subscribed notification by its ID.</p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>
