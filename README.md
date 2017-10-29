@@ -11,6 +11,7 @@ opendxl-client-erlang requires Erlang R17+.
 
 See the [Wiki](https://github.com/waymirec/opendxl-client-erlang/wiki) for an overview of the Data Exchange Layer (DXL), the OpenDXL Erlang client, and examples.
 
+See the [Erlang Client SDK Documentation](https://waymirec.github.io/opendxl-client-erlang/) for API documentation.
 ## Usage
 
 ### events
