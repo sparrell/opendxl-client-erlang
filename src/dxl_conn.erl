@@ -53,9 +53,9 @@
 %%%============================================================================
 %%% API Functions
 %%%============================================================================
-start_link([GID, MqttOpts]) ->
+start_link([GID, Opts]) ->
     Name = dxl_util:module_reg_name(GID, ?MODULE),
-    gen_server:start_link({local, Name}, ?MODULE, [GID, MqttOpts], []).
+    gen_server:start_link({local, Name}, ?MODULE, [GID, Opts], []).
 
 is_connected(Pid) ->
     gen_server:call(Pid, is_connected).
@@ -99,13 +99,14 @@ set_client_id(Pid, ClientId) ->
 %%%============================================================================
 %%% gen_server functions
 %%%============================================================================
-init([GID, MqttOpts]) ->
-    ClientId = proplists:get_value(client_id, MqttOpts, dxl_util:generate_uuid()),
+init([GID, OptsIn]) ->
+    Opts = init_opts(OptsIn),
+    ClientId = proplists:get_value(client_id, Opts, dxl_util:generate_uuid()),
     ReplyToTopic = list_to_bitstring("/mcafee/client/" ++ ClientId),
-    {ok, Conn} = emqttc:start_link(MqttOpts),
+    {ok, Conn} = emqttc:start_link(Opts),
     emqttc:subscribe(Conn, ReplyToTopic),
     State = #state{gid            = GID,
-                   opts           = MqttOpts,
+                   opts           = Opts,
                    mqttc          = Conn,
                    client_id      = ClientId,
                    reply_to_topic = ReplyToTopic,
@@ -210,6 +211,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%============================================================================
 %%% Internal functions
 %%%============================================================================
+init_opts(Opts) ->
+    DxlConnOpts = [{logger, {lager, info}}, auto_resub],
+    lists:flatten([DxlConnOpts | Opts]).
+
 do_is_connected(State) ->
     #state{mqttc = C} = State,
     R = emqttc:is_connected(C),

@@ -19,7 +19,6 @@ read_from_file(Filename) ->
             ConnectRetries = binary_to_integer(get_value('General', 'ConnectRetries', Config, <<"3">>)),
             ReconnDelayMin = binary_to_integer(get_value('General', 'ReconnectDelayMin', Config, <<"1">>)),
             ReconnDelayMax = binary_to_integer(get_value('General', 'ReconnectDelayMax', Config, <<"30">>)),
-            LogLevel = binary_to_atom(get_value('General', 'LogLevel', Config, <<"info">>), utf8),
 
 	    {ok, [{client_id, ClientId},
               {brokers, Hosts},
@@ -29,9 +28,7 @@ read_from_file(Filename) ->
                   {certfile, CertFile},
                   {keyfile, PrivateKey}
               ]},
-              {reconnect, {ReconnDelayMin, ReconnDelayMax, ConnectRetries}},
-              {logger, {lager, LogLevel}},
-              auto_resub]};
+              {reconnect, {ReconnDelayMin, ReconnDelayMax, ConnectRetries}}]};
         Error ->
             Error
     end.

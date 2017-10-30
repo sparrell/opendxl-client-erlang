@@ -648,9 +648,6 @@ init([Parent, GID, Opts]) ->
     {ok, NotifMan} = dxl_notif_man:start_link(GID),
     dxl_notif_man:subscribe(NotifMan, connection, self()),
 
-    lager:info("OPTS (before): ~p.", [Opts]),
-    lager:info("OPTS (after): ~p.", [init_opts(Opts)]),
-
     {ok, ServiceMan} = dxl_service_man:start_link(GID),
     {ok, DxlConn} = dxl_conn:start_link([GID, init_opts(Opts)]),
 
@@ -798,9 +795,7 @@ code_change(_OldVsn, State, _Extra) ->
 init_opts(Opts) ->
     init_opts(Opts, [{client_id, dxl_util:generate_uuid()},
                      {keepalive, 30 * 60},
-                     {reconnect, {1, 60, 5}},
-                     {logger, {lager, info}},
-                     auto_resub]).
+                     {reconnect, {1, 60, 5}}]).
 
 init_opts([], Config) ->
     Config;
