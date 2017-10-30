@@ -15,7 +15,11 @@ See the [Erlang Client SDK Documentation](https://waymirec.github.io/opendxl-cli
 ## Usage
 
 ### events
-The DXL fabric allows for event-based communication, typically referred to as “publish/subscribe” model wherein clients register interest by subscribing to a particular topic and publishers periodically send events to that topic. The event is delivered by the DXL fabric to all of the currently subscribed clients for the topic. Therefore, a single event sent can reach multiple clients (one-to-many). It is important to note that in this model the client passively receives events when they are sent by a publisher.
+The DXL fabric allows for event-based communication, typically referred to as “publish/subscribe” model wherein clients 
+register interest by subscribing to a particular topic and publishers periodically send events to that topic. The event 
+is delivered by the DXL fabric to all of the currently subscribed clients for the topic. Therefore, a single event sent 
+can reach multiple clients (one-to-many). It is important to note that in this model the client passively receives events 
+when they are sent by a publisher.
 
 ```erlang
 %% load config from file
@@ -36,7 +40,10 @@ dxlc:stop(Client).
 ```
 
 ### services
-The DXL fabric allows for “services” to be registered and exposed that respond to requests sent by invoking clients. This communication is point-to-point (one-to-one), meaning the communication is solely between an invoking client and the service that is being invoked. It is important to note that in this model the client actively invokes the service by sending it requests.
+The DXL fabric allows for “services” to be registered and exposed that respond to requests sent by invoking clients. 
+This communication is point-to-point (one-to-one), meaning the communication is solely between an invoking client and 
+the service that is being invoked. It is important to note that in this model the client actively invokes the service 
+by sending it requests.
 ```erlang
 %% load config from file
 {ok, Config} = dxl_client_conf:read_from_file(<<"/path/to/config">>),
@@ -65,6 +72,73 @@ ok.
 ```
 
 ### Notifications
+The OpenDXL Erlang Client leverages a notification system that is used to register callbacks for internal notices by 
+category. Examples of categories that you can subscribe to would be <i>message_in</i> for inbound DXL messages,
+<i>connection</i> for client connection events, and <i>service</i> for service related events. Callbacks can be in the 
+form of a function, a pid, or {M,F,A} and in all cases will accept a single argument that varies based on the category.
+
+<b><u>Connection Events</b></u>
+```erlang
+-module(example).
+
+-behaviour(gen_server).
+
+%% API
+-export([start_link/0]).
+
+%% gen_server callbacks
+-export([init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
+
+-record(state, {}).
+
+%%%============================================================================
+%%% API functions
+%%%============================================================================
+
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+%%%============================================================================
+%%% gen_server functions
+%%%============================================================================
+init([]) ->
+    Config = load_config(),
+    {ok, Client} = dxlc:start(Config),
+    dxlc:subscribe_notification(Client, connection, self()),
+    {ok, #state{}}.
+
+handle_call(_Request, _From, State) ->
+    {reply, ignored, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info({connected, _Client}, State) ->
+    do_something(),
+    {noreply, State};
+
+handle_info({disconnected, _Client}, State) ->
+    do_something_else(),
+    {noreply, State};
+    
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, _State) ->
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%%%============================================================================
+%%% Internal functions
+%%%============================================================================
+```
 
 ## Build
 ```
