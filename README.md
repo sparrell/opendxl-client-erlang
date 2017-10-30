@@ -180,15 +180,16 @@ by sending it requests.
 {ok, Client} = dxlc:start(Config),
 
 Fun = fun({message_in, {Topic, Message, ClientIn}}) ->
-              #dxlmessage{message_id=MessageId, payload=Payload, reply_to_topic=ReplyToTopic} = Message,
-              lager:info("Service Provider - Request received: Topic=~s, ID=~s, Payload=~s", [Topic, MessageId, Payload]),
-              lager:info("Service Provider - Creating a response for request ~s on ~s.", [MessageId, ReplyToTopic]),
-              dxlc:send_response(ClientIn, Message, <<"Sample Response Payload"/utf8>>),
-              lager:info("Response sent.", []),
-              ok
+         #dxlmessage{message_id=MessageId, payload=Payload, reply_to_topic=ReplyToTopic} = Message,
+         lager:info("Request received: Topic=~s, ID=~s, Payload=~s", [Topic, MessageId, Payload]),
+         lager:info("Creating a response for request ~s on ~s.", [MessageId, ReplyToTopic]),
+         dxlc:send_response(ClientIn, Message, <<"Sample Response Payload"/utf8>>),
+         lager:info("Response sent.", []),
+          ok
  	  end,
 
-ServiceRegistry = #service_registration{type = <<"/mycompany/myservice">>, topics=#{?SERVICE_TOPIC => Fun}},
+ServiceRegistry = #service_registration{type = <<"/mycompany/myservice">>, 
+                                        topics=#{?SERVICE_TOPIC => Fun}},
 lager:info("Registering service: ~s", [ServiceRegistry#service_registration.type]),
 {ok, ServiceId} = dxlc:register_service(Client, ServiceRegistry, 10000), 
 lager:info("Successfully registered service: ~s", [ServiceId]),
@@ -402,7 +403,7 @@ process_message({<<"/my/topic">>, #dxlmessage{type=event} = Message, Client}, My
     ok;
 
 %% Match messages of any type from a specific client id.
-process_message({Topic, #dxlmessage{client_ids = [<<"target_client_id">> | _]} = Message, Client}, MyPid) ->
+process_message({_Topic, #dxlmessage{client_ids = [<<"target_client_id">> | _]} = _M, Client}, MyPid) ->
     lager:debug("Got message from client: ~p.", [ClientId]),
     ok;
 
