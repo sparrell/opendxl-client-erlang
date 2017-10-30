@@ -17,13 +17,14 @@ message_type_test() ->
     ?assertEqual(3, dxl_util:message_type(error)).
 
 event_test() ->
+    TestTopic = dxlc_test_util:generate_test_topic(),
     {ok, C} = dxlc_test_util:start_client(),
-    {ok, _CallbackId} = dxlc:subscribe(C, <<"/test/topic">>, self()),
-    ok = dxlc:send_event(C, <<"/test/topic">>, <<"test event">> ),
+    {ok, _CallbackId} = dxlc:subscribe(C, TestTopic, self()),
+    ok = dxlc:send_event(C, TestTopic, <<"test event">> ),
     receive
-        {message_in, _} -> ok
+        _ -> ok
     after
-        1000 -> exit(timeout)
+        3000 -> exit(timeout)
     end.
 
 -endif.

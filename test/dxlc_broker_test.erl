@@ -17,7 +17,7 @@ active_service_count_test() ->
 
     {ok, C} = dxlc_test_util:start_client(),
     Payload = <<"response">>,
-    Fun = fun({message_in, {_, Msg, Client}}) -> dxlc:send_response(Client, Msg, Payload) end,
+    Fun = fun({_, Msg, Client}) -> dxlc:send_response(Client, Msg, Payload) end,
     Topics = [{TestTopic, Fun}],
     Service = #service_registration{type = TestType, topics = Topics},
     {ok, ServiceId} = dxlc:register_service(C, Service),

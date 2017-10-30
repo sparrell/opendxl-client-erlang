@@ -75,12 +75,22 @@ ok.
 The OpenDXL Erlang Client leverages a notification system that is used to register callbacks for internal notices by 
 category. Examples of categories that you can subscribe to would be <i>message_in</i> for inbound DXL messages,
 <i>connection</i> for client connection events, and <i>service</i> for service related events.
-Callbacks can be one of the following:
+
+```erlang
+dxlc:subscribe_notification(Client, connection, Callback, Opts)
+```
+
+<i>Callback</i> can be one of the following:
 * Pid - called via normal message pattern (e.g. Pid ! Data)
 * Function - function executed (e.g. Function(Data))
 * {M,F,A} - standard erlang:apply call (e.g. M:F([Data | A]))
 
-<b><u>Connection Events</b></u>
+<i>Opts</i> is a list of tagged-tuple options:
+* single_use - if set to true this callback will deregister after it's first use.
+* filter - specify a function that will be used to filter matches for this callback
+* timeout - specify a timeout (in ms) before deregistering this callback. Also allows for providing a callback to execute if a timeout occurs (e.g. {timeout, {5000, timeout_func/1})
+
+<b><u>Notifications::Connection Events (with pid callback)</b></u>
 ```erlang
 -module(example).
 
@@ -130,7 +140,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 ```
 
-<b><u>Service Events</b></u>
+<b><u>Notifications::Service Events (with function callback)</b></u>
 ```erlang
 -module(example).
 
@@ -196,7 +206,7 @@ lager:debug("Service failed to deregister: ~p (~p) => ~p.", [ServiceType, Servic
     ok.
 ```
 
-<b><u>Message Events</b></u>
+<b><u>Notifications::Message Events (with MFA callback)</b></u>
 ```erlang
 -module(example).
 

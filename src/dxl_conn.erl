@@ -239,7 +239,7 @@ do_send_request(Sender, Topic, Message, Timeout, State) ->
     Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
     Callback = fun({_, M, _}) -> gen_server:reply(Sender, M) end,
     Filter = dxl_util:create_response_filter(Message),
-    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
+    Opts = [{single_use, true}, {filter, Filter}, {timeout, Timeout}],
     {ok, _} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
     ok = publish(request, Topic, Message1, State).
 
@@ -253,7 +253,7 @@ do_send_request_async(Topic, Message, Callback, Timeout, State) ->
     #state{reply_to_topic = ReplyToTopic, notif_man = NotifMan} = State,
     Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
     Filter = dxl_util:create_response_filter(Message1),
-    Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
+    Opts = [{single_use, true}, {filter, Filter}, {timeout, Timeout}],
     {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
     ok = publish(request, Topic, Message1, State),
     {ok, NotifId}.

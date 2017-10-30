@@ -245,7 +245,7 @@ deregister_service(Pid, Id, Timeout) ->
 %%%      Callback = fun({service_unregistered, Id, Type}) -> do_something;
 %%%                    ({service_unregistration_failed, Id, Type, Reason}) -> uh_oh
 %%%                 end,
-%%%      Opts = [{filter, Filter}, {one_time_only, true}],
+%%%      Opts = [{filter, Filter}, {single_use, true}],
 %%%      {ok, NotifId} = dxlc:subscribe_notification(Pid, service, Callback, Opts)
 %%% </pre>
 %%% @end

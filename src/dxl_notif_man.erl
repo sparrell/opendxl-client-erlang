@@ -33,7 +33,7 @@
     callback :: term(),
     filter = none :: term(),
     timer = make_ref() :: reference(),
-    one_time_only = false :: true | false
+    single_use = false :: true | false
 }).
 
 %%%============================================================================
@@ -109,11 +109,11 @@ code_change(_OldVsn, State, _Extra) ->
 do_subscribe(Category, Callback, Opts, Owner, State) ->
     #state{subscriptions = Subscriptions} = State,
     Filter = proplists:get_value(filter, Opts, none),
-    OneTimeOnly = proplists:get_value(one_time_only, Opts, false),
+    SingleUse = proplists:get_value(single_use, Opts, false),
     Timeout = proplists:get_value(timeout, Opts, infinity),
     Id = make_ref(),
     lager:debug("Registering notification: Owner=~p, Event=~p, Callback=~p, Opts=~p", [Owner, Category, Callback, Opts]),
-    Sub = #sub{id = Id, category = Category, callback = Callback, filter = Filter, one_time_only = OneTimeOnly},
+    Sub = #sub{id = Id, category = Category, callback = Callback, filter = Filter, single_use = SingleUse},
     Sub1 = case Timeout of
                {I, Cb} when is_integer(I) ->
                    TimerRef = erlang:send_after(I, self(), {notification_timeout, Id, Cb}),
@@ -159,7 +159,7 @@ do_publish(Category, Data, State) ->
     do_publish(Category, Data, List, State).
 
 do_publish(Category, Data, [Sub | Rest], State) ->
-    #sub{id = Id, callback = Callback, filter = Filter, timer = Timer, one_time_only = Once} = Sub,
+    #sub{id = Id, callback = Callback, filter = Filter, timer = Timer, single_use = SingleUse} = Sub,
     erlang:cancel_timer(Timer),
     Self = self(),
     F = fun() ->
@@ -174,7 +174,7 @@ do_publish(Category, Data, [Sub | Rest], State) ->
                 catch
                     _ -> unsubscribe(Self, Id)
                 end,
-                case Once of
+                case SingleUse of
                     false -> ok;
                     true -> unsubscribe(Self, Id)
                 end

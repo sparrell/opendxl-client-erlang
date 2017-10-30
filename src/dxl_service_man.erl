@@ -82,7 +82,7 @@ handle_call({register, Sender, Registration, Timeout}, _From, State) ->
     Fun = fun({service_registered, ServiceId, _}) -> gen_server:reply(Sender, {ok, ServiceId});
              ({service_registration_failed, _ServiceId, Error}) -> gen_server:reply(Sender, Error)
           end,
-    Opts = [{filter, Filter}, {one_time_only, true}],
+    Opts = [{filter, Filter}, {single_use, true}],
     dxl_notif_man:subscribe(NotifMan, service, Fun, Opts),
 
     State1 = do_register_service(Id, Registration, Timeout, State),
@@ -92,7 +92,7 @@ handle_call({register_async, Registration, Callback, Timeout}, _From, State) ->
     #state{notif_man = NotifMan} = State,
     Id = dxl_util:generate_uuid(),
     Filter = fun({_, ServiceId, _}) -> ServiceId =:= Id end,
-    Opts = [{filter, Filter}, {one_time_only, true}],
+    Opts = [{filter, Filter}, {single_use, true}],
     dxl_notif_man:subscribe(NotifMan, service, Callback, Opts),
 
     State1 = do_register_service(Id, Registration, Timeout, State),
@@ -109,7 +109,7 @@ handle_call({deregister, Sender, Id, Timeout}, _From, State) ->
             Fun = fun({service_deregistered, _ServiceId, _}) -> gen_server:reply(Sender, ok);
                      ({service_deregistration_failed, _ServiceId, Error}) -> gen_server:reply(Sender, Error)
                   end,
-            Opts = [{filter, Filter}, {one_time_only, true}],
+            Opts = [{filter, Filter}, {single_use, true}],
             dxl_notif_man:subscribe(NotifMan, service, Fun, Opts),
             State1 = do_unregister_service(Id, Pid, Timeout, State),
             {reply, ok, State1}
@@ -122,7 +122,7 @@ handle_call({deregister_async, Id, Callback, Timeout}, _From, State) ->
             {reply, {error, unknown_service}, State};
         {_, Pid, _} ->
             Filter = fun({_, ServiceId, _}) -> ServiceId =:= Id end,
-            Opts = [{filter, Filter}, {one_time_only, true}],
+            Opts = [{filter, Filter}, {single_use, true}],
             dxl_notif_man:subscribe(NotifMan, service, Callback, Opts),
             State1 = do_unregister_service(Id, Pid, Timeout, State),
             {reply, ok, State1}

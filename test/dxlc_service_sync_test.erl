@@ -16,7 +16,7 @@ service_test() ->
     TestTopic = dxlc_test_util:generate_test_topic(),
     {ok, C} = dxlc_test_util:start_client(),
     Payload = <<"response">>,
-    Fun = fun({message_in, {_, Msg, Client}}) -> dxlc:send_response(Client, Msg, Payload) end,
+    Fun = fun({_, Msg, Client}) -> dxlc:send_response(Client, Msg, Payload) end,
     Topics = [{TestTopic, Fun}],
     Service = #service_registration{type = <<"/test/svc/type">>, topics = Topics},
     {ok, ServiceId} = dxlc:register_service(C, Service),
@@ -29,7 +29,7 @@ service_deregister_test() ->
     TestTopic = dxlc_test_util:generate_test_topic(),
     {ok, C} = dxlc_test_util:start_client(),
     Payload = <<"response">>,
-    Fun = fun({message_in, {_, Msg, _}}) -> dxlc:send_response(C, Msg, Payload) end,
+    Fun = fun({_, Msg, _}) -> dxlc:send_response(C, Msg, Payload) end,
     Topics = #{TestTopic => Fun},
     Service = #service_registration{type = <<"/test/svc/type">>, topics = Topics},
     {ok, ServiceId} = dxlc:register_service(C, Service),
@@ -47,7 +47,7 @@ service_deregister_unknown_test() ->
 service_request_timeout_test() ->
     TestTopic = dxlc_test_util:generate_test_topic(),
     {ok, C} = dxlc_test_util:start_client(),
-    Fun = fun({message_in, {_, _, _}}) -> ok end,
+    Fun = fun({_, _, _}) -> ok end,
     Topics = #{TestTopic => Fun},
     Service = #service_registration{type = <<"/test/svc/type">>, topics = Topics},
     {ok, ServiceId} = dxlc:register_service(C, Service),
@@ -58,7 +58,7 @@ service_request_timeout_test() ->
 service_conversation_test() ->
     TestTopic = dxlc_test_util:generate_test_topic(),
     Payload = <<"response">>,
-    Fun = fun({message_in, {_, Msg, Client}}) -> dxlc:send_response(Client, Msg, Payload) end,
+    Fun = fun({_, Msg, Client}) -> dxlc:send_response(Client, Msg, Payload) end,
     Topics = [{TestTopic, Fun}],
     Service = #service_registration{type = <<"/test/svc/type">>, topics = Topics},
 
