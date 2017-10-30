@@ -184,9 +184,9 @@ send_registration_request(State) ->
     Payload = build_registration_payload(State),
     Request = #dxlmessage{payload = Payload, dst_tenant_ids = State#state.dst_tenant_ids},
     Self = self(),
-    Fun = fun({message_in, {_, #dxlmessage{type = response}, _}}) ->
+    Fun = fun({_, #dxlmessage{type = response}, _}) ->
                  gen_server:cast(Self, registration_success);
-             ({message_in, {_, #dxlmessage{type = error, error_code = ErrCode, error_message = ErrMsg}, _}}) ->
+             ({_, #dxlmessage{type = error, error_code = ErrCode, error_message = ErrMsg}, _}) ->
                  gen_server:cast(Self, {registration_failed, {error, {ErrCode, ErrMsg}}})
           end,
     dxl_conn:send_request_async(DxlConn, ?SVC_REG_REQ_TOPIC, Request, Fun, infinity),
@@ -216,7 +216,7 @@ subscribe_to_notification(_Topic, undefined, _NotifMan) ->
     undefined;
 
 subscribe_to_notification(Topic, Callback, NotifMan) ->
-    Filter = fun({message_in, {TopicIn, #dxlmessage{type = TypeIn}, _}}) ->
+    Filter = fun({TopicIn, #dxlmessage{type = TypeIn}, _}) ->
         (TypeIn =:= request) and (TopicIn =:= Topic)
              end,
     {ok, NotifId} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, [{filter, Filter}]),
@@ -234,9 +234,9 @@ send_deregistration_request(State) ->
     Payload = build_deregistration_payload(State),
     Request = #dxlmessage{payload = Payload},
     Self = self(),
-    Fun = fun({message_in, {_, #dxlmessage{type = response}, _}}) ->
+    Fun = fun({_, #dxlmessage{type = response}, _}) ->
                  gen_server:cast(Self, deregistration_success);
-             ({message_in, {_, #dxlmessage{type = error, error_code = ErrCode, error_message = ErrMsg}, _}}) ->
+             ({_, #dxlmessage{type = error, error_code = ErrCode, error_message = ErrMsg}, _}) ->
                  gen_server:cast(Self, {deregistration_failed, {ErrCode, ErrMsg}})
           end,
     dxl_conn:send_request_async(DxlConn, ?SVC_UNREG_REQ_TOPIC, Request, Fun, infinity),

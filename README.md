@@ -74,8 +74,11 @@ ok.
 ### Notifications
 The OpenDXL Erlang Client leverages a notification system that is used to register callbacks for internal notices by 
 category. Examples of categories that you can subscribe to would be <i>message_in</i> for inbound DXL messages,
-<i>connection</i> for client connection events, and <i>service</i> for service related events. Callbacks can be in the 
-form of a function, a pid, or {M,F,A} and in all cases will accept a single argument that varies based on the category.
+<i>connection</i> for client connection events, and <i>service</i> for service related events.
+Callbacks can be one of the following:
+* Pid - called via normal message pattern (e.g. Pid ! Data)
+* Function - function executed (e.g. Function(Data))
+* {M,F,A} - standard erlang:apply call (e.g. M:F([Data | A]))
 
 <b><u>Connection Events</b></u>
 ```erlang
@@ -83,10 +86,8 @@ form of a function, a pid, or {M,F,A} and in all cases will accept a single argu
 
 -behaviour(gen_server).
 
-%% API
 -export([start_link/0]).
 
-%% gen_server callbacks
 -export([init/1,
          handle_call/3,
          handle_cast/2,
@@ -96,16 +97,9 @@ form of a function, a pid, or {M,F,A} and in all cases will accept a single argu
 
 -record(state, {}).
 
-%%%============================================================================
-%%% API functions
-%%%============================================================================
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%%%============================================================================
-%%% gen_server functions
-%%%============================================================================
 init([]) ->
     Config = load_config(),
     {ok, Client} = dxlc:start(Config),
@@ -134,10 +128,136 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+```
 
-%%%============================================================================
-%%% Internal functions
-%%%============================================================================
+<b><u>Service Events</b></u>
+```erlang
+-module(example).
+
+-behaviour(gen_server).
+
+-export([start_link/0]).
+
+-export([init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
+
+-record(state, {}).
+
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+init([]) ->
+    Config = load_config(),
+    {ok, Client} = dxlc:start(Config),
+    dxlc:subscribe_notification(Client, service, fun process_service_notice/1),
+    {ok, #state{}}.
+
+handle_call(_Request, _From, State) ->
+    {reply, ignored, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info({connected, _Client}, State) ->
+    do_something(),
+    {noreply, State};
+
+handle_info({disconnected, _Client}, State) ->
+    do_something_else(),
+    {noreply, State};
+    
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, _State) ->
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+    
+process_service_notice({service_registered, ServiceId, ServiceType}) ->
+    lager:debug("Sevice Registered: ~p (~p).", [ServiceType, ServiceId]),
+    ok;
+    
+process_service_notice({service_registration_failed, ServiceId, ServiceType, Reason}) ->
+    lager:debug("Service failed to register: ~p (~p) => ~p.", [ServiceType, ServiceId, Reason]),
+    ok;
+    
+process_service_notice({service_deregistered, ServiceId, ServiceType}) ->
+    lager:debug("Sevice Deregistered: ~p (~p).", [ServiceType, ServiceId]),
+    ok;
+
+process_service_notice({service_deregistration_failed, ServiceId, ServiceType, Reason}) ->
+lager:debug("Service failed to deregister: ~p (~p) => ~p.", [ServiceType, ServiceId, Reason]),
+    ok.
+```
+
+<b><u>Message Events</b></u>
+```erlang
+-module(example).
+
+-behaviour(gen_server).
+
+-export([start_link/0]).
+
+-export([init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
+
+-export([process_message/2]).
+
+-record(state, {}).
+
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+init([]) ->
+    Config = load_config(),
+    {ok, Client} = dxlc:start(Config),
+    dxlc:subscribe_notification(Client, message_in, {?MODULE, process_message, [self()]}),
+    {ok, #state{}}.
+    {ok, #state{}}.
+
+handle_call(_Request, _From, State) ->
+    {reply, ignored, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, _State) ->
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%% Match messages of any type to a specific topic
+process_message({<<"/my/topic">>, #dxlmessage{type=Type} = Message, Client}, MyPid) ->
+    lager:debug("Got a message of type ~p for topic ~p.", [Type, Topic]),
+    ok;
+    
+%% Match messages of specific type to a specific topic
+process_message({<<"/my/topic">>, #dxlmessage{type=event} = Message, Client}, MyPid) ->
+    lager:debug("Got an event for topic ~p.", [Topic]),
+    ok;
+
+%% Match messages of any type from a specific client id.
+process_message({Topic, #dxlmessage{client_ids = [<<"target_client_id">> | _]} = Message, Client}, MyPid) ->
+    lager:debug("Got message from client: ~p.", [ClientId]),
+    ok;
+
+%% Match anything else
+process_message({Topic, Message, Client}, MyPid) ->
+    ok.
 ```
 
 ## Build

@@ -91,18 +91,18 @@ message_is_a_reply(#dxlmessage{} = Message, #dxlmessage{} = Request) ->
     end.
 
 create_topic_filter(Topic) ->
-    fun({message_in, {T, _, _}}) -> Topic =:= T end.
+    fun({T, _, _}) -> Topic =:= T end.
 
 create_topic_filter(TypeIn, TopicIn) ->
-    fun({message_in, {Topic, #dxlmessage{type = Type}, _}}) when Type =:= TypeIn, Topic =:= TopicIn -> true;
-       ({message_in, {_, _, _}}) -> false
+    fun({Topic, #dxlmessage{type = Type}, _}) when Type =:= TypeIn, Topic =:= TopicIn -> true;
+       ({_, _, _}) -> false
     end.
 
 create_request_filter(Topic) ->
     create_topic_filter(request, Topic).
 
 create_response_filter(#dxlmessage{} = Request) ->
-    fun({message_in, {_, #dxlmessage{} = Message, _}}) -> dxl_util:message_is_a_reply(Message, Request);
+    fun({_, #dxlmessage{} = Message, _}) -> dxl_util:message_is_a_reply(Message, Request);
        ({_, _, _}) -> false
     end.
 

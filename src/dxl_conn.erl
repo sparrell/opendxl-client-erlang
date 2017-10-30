@@ -195,7 +195,7 @@ handle_info({publish, Topic, Binary}, State) ->
     #state{client = Client, notif_man = NotifMan} = State,
     Message = dxl_decoder:decode(Binary),
     dxl_util:log_dxlmessage("Inbound DXL Message", Message),
-    dxl_notif_man:publish(NotifMan, message_in, {message_in, {Topic, Message, Client}}),
+    dxl_notif_man:publish(NotifMan, message_in, {Topic, Message, Client}),
     {noreply, State};
 
 handle_info(_Info, State) ->
@@ -237,7 +237,7 @@ do_send_request(Topic, Message, State) ->
 do_send_request(Sender, Topic, Message, Timeout, State) ->
     #state{reply_to_topic = ReplyToTopic, notif_man = NotifMan} = State,
     Message1 = Message#dxlmessage{reply_to_topic = ReplyToTopic},
-    Callback = fun({message_in, {_, M, _}}) -> gen_server:reply(Sender, M) end,
+    Callback = fun({_, M, _}) -> gen_server:reply(Sender, M) end,
     Filter = dxl_util:create_response_filter(Message),
     Opts = [{one_time_only, true}, {filter, Filter}, {timeout, Timeout}],
     {ok, _} = dxl_notif_man:subscribe(NotifMan, message_in, Callback, Opts),
@@ -286,6 +286,6 @@ publish(Type, Topic, Message, State) ->
 verify_client_id(State) ->
     BadTopic = list_to_bitstring("/bad/topic/" ++ dxl_util:generate_uuid()),
     Self = self(),
-    Callback = fun({message_in, {_, #dxlmessage{client_ids = [ClientId | _]}, _}}) -> gen_server:cast(Self, {verify_client_id, ClientId}) end,
+    Callback = fun({_, #dxlmessage{client_ids = [ClientId | _]}, _}) -> gen_server:cast(Self, {verify_client_id, ClientId}) end,
     do_send_request_async(BadTopic, #dxlmessage{}, Callback, 3000, State).
 

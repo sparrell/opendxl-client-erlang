@@ -7,7 +7,7 @@
 -export([execute/2]).
 
 execute({M,F,A}, Data) when is_atom(M) and is_atom(F) ->
-    erlang:apply(M, F, [Data | A]);
+    erlang:apply(M, F, lists:flatten([Data | A]));
 
 execute(Callback, Data) when is_function(Callback, 1) ->
     Callback(Data);

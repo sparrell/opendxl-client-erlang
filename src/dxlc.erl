@@ -755,10 +755,10 @@ handle_call({get_all_active_services, ServiceType}, From, State) ->
                      _ -> dxl_util:term_to_json_bin({[{serviceType, ServiceType}]})
                  end,
     Request = #dxlmessage{payload = Payload},
-    Callback = fun({message_in, {_, #dxlmessage{type = response} = M, _}}) ->
+    Callback = fun({_, #dxlmessage{type = response} = M, _}) ->
                       Data = dxl_util:json_bin_to_term(M#dxlmessage.payload),
                       gen_server:reply(From, maps:get(<<"services">>, Data));
-                  ({message_in, {_, #dxlmessage{type = error} = M, _}}) ->
+                  ({_, #dxlmessage{type = error} = M, _}) ->
                       gen_server:reply(From, {error, M#dxlmessage.error_code, M#dxlmessage.error_message})
                end,
     dxl_conn:send_request_async(DxlConn, ?SVC_REG_QUERY_TOPIC, Request, Callback, 3000),
