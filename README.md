@@ -77,9 +77,8 @@ category. Examples of categories that you can subscribe to would be <i>message_i
 <i>connection</i> for client connection events, and <i>service</i> for service related events.
 
 ```erlang
-dxlc:subscribe_notification(Client, connection, Callback, Opts)
+dxlc:subscribe_notification(Client, Category, Callback, Opts)
 ```
-
 <i>Callback</i> can be one of the following:
 * Pid - called via normal message pattern (e.g. Pid ! Data)
 * Function - function executed (e.g. Function(Data))
@@ -90,7 +89,20 @@ dxlc:subscribe_notification(Client, connection, Callback, Opts)
 * filter - specify a function that will be used to filter matches for this callback
 * timeout - specify a timeout (in ms) before deregistering this callback. Also allows for providing a callback to execute if a timeout occurs (e.g. {timeout, {5000, timeout_func/1})
 
-<b><u>Notifications::Connection Events (with pid callback)</b></u>
+
+<b>Notification Categories</b>
+* <code>connection</code> - published when the DXL client connects or disconnects. The payload is a tagged tuple with the 
+first element being <code>connected</code> or <code>disconneced</code> and the second element being the pid of the DXL 
+client.
+* <code>service</code> - published for service related events; currently only registration and deregistration 
+notifications are published. The payload is a tagged tuple with the first element being <code>service_registered</code>,
+<code>service_deregistered</code>, <code>service_registration_failed</code> or <code>service_deregistration_failed</code>.
+For the success notices the remaining elements in the payload tuple are the service id and service type. For the failure 
+notices there is a fourth element containing the reason for failure, which is typically of the form {Error, Reason}.
+* <code>message_in</code> - published for any incoming messages on the DXL fabric. The payload contains the message
+topic, the message packet, and the DXL client pid in the form {Topic, Message, Client}.
+
+<b><u>Notifications :: Connection Events (with pid callback)</b></u>
 ```erlang
 -module(example).
 
@@ -140,7 +152,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 ```
 
-<b><u>Notifications::Service Events (with function callback)</b></u>
+<b><u>Notifications :: Service Events (with function callback)</b></u>
 ```erlang
 -module(example).
 
@@ -206,7 +218,7 @@ lager:debug("Service failed to deregister: ~p (~p) => ~p.", [ServiceType, Servic
     ok.
 ```
 
-<b><u>Notifications::Message Events (with MFA callback)</b></u>
+<b><u>Notifications :: Message Events (with MFA callback)</b></u>
 ```erlang
 -module(example).
 
@@ -269,7 +281,7 @@ process_message({Topic, #dxlmessage{client_ids = [<<"target_client_id">> | _]} =
 process_message({Topic, Message, Client}, MyPid) ->
     ok.
 ```
-<b><u>Notifications::Filter examples</b></u>
+<b><u>Notifications :: Filter examples</b></u>
 ```erlang
 %% Filter messages by topic
 Filter = fun({Topic, _Message, _Client}) -> Topic =:= <<"/my/topic">> end,
