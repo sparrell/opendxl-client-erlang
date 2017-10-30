@@ -12,6 +12,134 @@ opendxl-client-erlang requires Erlang R17+.
 See the [Wiki](https://github.com/waymirec/opendxl-client-erlang/wiki) for an overview of the Data Exchange Layer (DXL), the OpenDXL Erlang client, and examples.
 
 See the [Erlang Client SDK Documentation](https://waymirec.github.io/opendxl-client-erlang/) for API documentation.
+
+## Installation
+To start using the OpenDXL Erlang Client Library:
+* Download [Rebar3](https://www.rebar3.org/)
+* Modify the rebar.config and add opendxl-erlang-client to the deps tuple.
+* From your root source directory run <code>rebar3 compile</code>
+
+Review the [OpenWeatherMap Service Example](https://github.com/waymirec/opendxl-client-erlang/tree/master/examples/service_wrapper) for a complete example on how to use the OpenDXL Erlang client including
+a sample rebar.config. 
+
+````
+C02VCDMNHTD6:service_wrapper cwaymire$ pwd
+/source/opendxl/opendxl-client-erlang/examples/service_wrapper
+C02VCDMNHTD6:service_wrapper cwaymire$ rebar3 compile
+===> Verifying dependencies...
+===> Fetching eini ({git,"https://github.com/erlcloud/eini.git",
+                                {branch,"master"}})
+===> Fetching emqttc ({git,"https://github.com/waymirec/emqttc.git",
+                                  {branch,"master"}})
+===> Fetching jiffy ({git,"https://github.com/davisp/jiffy.git",
+                                 {branch,"master"}})
+===> Fetching lager ({git,"https://github.com/erlang-lager/lager.git",
+                                 {tag,"3.5.1"}})
+===> Fetching msgpack ({git,"git://github.com/msgpack/msgpack-erlang.git",
+                                   {branch,"master"}})
+===> Fetching gen_logger ({git,"https://github.com/emqtt/gen_logger.git",
+                                      {branch,"master"}})
+===> Fetching goldrush ({pkg,<<"goldrush">>,<<"0.1.9">>})
+===> Downloaded package, caching at /Users/cwaymire/.cache/rebar3/hex/default/packages/goldrush-0.1.9.tar
+===> Skipping lager (from {git,"https://github.com/basho/lager.git",
+                                      {branch,"master"}}) as an app of the same name has already been fetched
+===> Compiling eini
+===> Compiling goldrush
+===> Compiling lager
+===> Compiling gen_logger
+===> Compiling msgpack
+===> Compiling jiffy
+Compiling c_src/decoder.c
+Compiling c_src/encoder.c
+Compiling c_src/jiffy.c
+Compiling c_src/utf8.c
+Compiling c_src/util.c
+Compiling c_src/doubles.cc
+Compiling c_src/objects.cc
+Compiling c_src/double-conversion/bignum-dtoa.cc
+Compiling c_src/double-conversion/bignum.cc
+Compiling c_src/double-conversion/cached-powers.cc
+Compiling c_src/double-conversion/diy-fp.cc
+Compiling c_src/double-conversion/double-conversion.cc
+Compiling c_src/double-conversion/fast-dtoa.cc
+Compiling c_src/double-conversion/fixed-dtoa.cc
+Compiling c_src/double-conversion/strtod.cc
+===> Compiling emqttc
+_build/default/lib/emqttc/src/emqttc_socket.erl:205: Warning: gen_fsm:send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+_build/default/lib/emqttc/src/emqttc_socket.erl:216: Warning: gen_fsm:send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+_build/default/lib/emqttc/src/emqttc_socket.erl:234: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+_build/default/lib/emqttc/src/emqttc_socket.erl:243: Warning: gen_fsm:send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+
+_build/default/lib/emqttc/src/emqttc.erl:173: Warning: gen_fsm:start_link/3 is deprecated and will be removed in a future release; use gen_statem:start_link/3
+_build/default/lib/emqttc/src/emqttc.erl:184: Warning: gen_fsm:start_link/4 is deprecated and will be removed in a future release; use gen_statem:start_link/4
+_build/default/lib/emqttc/src/emqttc.erl:192: Warning: gen_fsm:sync_send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:call/2
+_build/default/lib/emqttc/src/emqttc.erl:245: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+_build/default/lib/emqttc/src/emqttc.erl:253: Warning: gen_fsm:sync_send_event/2 is deprecated and will be removed in a future release; use gen_statem:call/2
+_build/default/lib/emqttc/src/emqttc.erl:326: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+_build/default/lib/emqttc/src/emqttc.erl:329: Warning: gen_fsm:sync_send_event/3 is deprecated and will be removed in a future release; use gen_statem:call/3
+_build/default/lib/emqttc/src/emqttc.erl:341: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+_build/default/lib/emqttc/src/emqttc.erl:349: Warning: gen_fsm:sync_send_event/3 is deprecated and will be removed in a future release; use gen_statem:call/3
+_build/default/lib/emqttc/src/emqttc.erl:357: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+_build/default/lib/emqttc/src/emqttc.erl:365: Warning: gen_fsm:sync_send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:call/2
+_build/default/lib/emqttc/src/emqttc.erl:489: Warning: gen_fsm:cancel_timer/1 is deprecated and will be removed in a future release; use erlang:cancel_timer/1
+_build/default/lib/emqttc/src/emqttc.erl:506: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
+_build/default/lib/emqttc/src/emqttc.erl:771: Warning: gen_fsm:cancel_timer/1 is deprecated and will be removed in a future release; use erlang:cancel_timer/1
+_build/default/lib/emqttc/src/emqttc.erl:979: Warning: gen_fsm:start_timer/2 is deprecated and will be removed in a future release; use erlang:start_timer/3
+_build/default/lib/emqttc/src/emqttc.erl:1069: Warning: gen_fsm:reply/2 is deprecated and will be removed in a future release; use gen_statem:reply/2
+_build/default/lib/emqttc/src/emqttc.erl:1082: Warning: gen_fsm:reply/2 is deprecated and will be removed in a future release; use gen_statem:reply/2
+_build/default/lib/emqttc/src/emqttc.erl:1093: Warning: gen_fsm:reply/2 is deprecated and will be removed in a future release; use gen_statem:reply/2
+```
+
+## Connect to Broker
+
+```
+Connect to DXL Broker:
+
+```erlang
+%% with config file
+{ok, Config} = dxl_client_conf:read_from_file(<<"/path/to/config">>)
+{ok, Client} = dxlc:start(Config)
+```
+```erlang
+%% without confifg file
+
+Config = [{client_id, <<"my-client-id">>},
+          {brokers, {"127.0.0.1", 8883}},
+          {keepalive, 60 * 30},
+          {ssl, [{cacertfile, <<"/path/to/cacertfile">>},
+                 {certfile, <<"/path/to/certfile">>},
+                 {keyfile, <<"/path/to/privatekey">>}]},
+          {reconnect, {1, 60, 5}}],
+
+{ok, Client} = dxlc:start(Config)
+
+```
+
+### Connect Options
+
+```erlang
+
+-type dxlc_opt() ::   {brokers, [{inet:ip_address() | string(), inet:port_number()}]}
+                    | {client_id, binary()}
+                    | {keepalive, non_neg_integer()}
+                    | {reconnect, non_neg_integer() | {non_neg_integer(), non_neg_integer()} | false}
+                    | ssl | {ssl, [dxl_sslopt()]}.
+                  
+
+-type dxl_sslopt() :: {cacertfile, binary()}
+                    | {certfile, binary()}
+                    | {keyfile, binary()}.
+```
+
+Option | Value | Default | Description | Example
+-------|-------|---------|-------------|---------
+brokers | list(tuple()) | {"localhost", 1883} | List of brokers | {"localhost", 1883}
+client_id | binary() | random clientId | DXL ClientId | <<"slimpleClientId">>
+keepalive | non_neg_integer() | 60 | MQTT KeepAlive(secs) 
+ssl | list(dxl_sslopt()) | [] | SSL Options | [{certfile, "path/to/ssl.crt"}, {keyfile,  "path/to/ssl.key"}]}]
+reconnect | tuple() | {1, 60, 5} | Client Reconnect | {1, 60, 5}
+
+
 ## Usage
 
 ### events
@@ -314,59 +442,6 @@ Filter = fun(Data) ->
          end,
 dxlc:subscribe_notifiation(Client, service, self(), [{filter, Filter}]),
 ```
-## Build
-$ rebar3 compile
-
-
-## Connect to Broker
-
-```
-Connect to DXL Broker:
-
-```erlang
-%% with config file
-{ok, Config} = dxl_client_conf:read_from_file(<<"/path/to/config">>)
-{ok, Client} = dxlc:start(Config)
-```
-```erlang
-%% without confifg file
-
-Config = [{client_id, <<"my-client-id">>},
-          {brokers, {"127.0.0.1", 8883}},
-          {keepalive, 60 * 30},
-          {ssl, [{cacertfile, <<"/path/to/cacertfile">>},
-                 {certfile, <<"/path/to/certfile">>},
-                 {keyfile, <<"/path/to/privatekey">>}]},
-          {reconnect, {1, 60, 5}}],
-
-{ok, Client} = dxlc:start(Config)
-
-```
-
-### Connect Options
-
-```erlang
-
--type dxlc_opt() ::   {brokers, [{inet:ip_address() | string(), inet:port_number()}]}
-                    | {client_id, binary()}
-                    | {keepalive, non_neg_integer()}
-                    | {reconnect, non_neg_integer() | {non_neg_integer(), non_neg_integer()} | false}
-                    | ssl | {ssl, [dxl_sslopt()]}.
-                  
-
--type dxl_sslopt() :: {cacertfile, binary()}
-                    | {certfile, binary()}
-                    | {keyfile, binary()}.
-```
-
-Option | Value | Default | Description | Example
--------|-------|---------|-------------|---------
-brokers | list(tuple()) | {"localhost", 1883} | List of brokers | {"localhost", 1883}
-client_id | binary() | random clientId | DXL ClientId | <<"slimpleClientId">>
-keepalive | non_neg_integer() | 60 | MQTT KeepAlive(secs) 
-ssl | list(dxl_sslopt()) | [] | SSL Options | [{certfile, "path/to/ssl.crt"}, {keyfile,  "path/to/ssl.key"}]}]
-reconnect | tuple() | {1, 60, 5} | Client Reconnect | {1, 60, 5}
-
 
 ## Bugs and Feedback
 
