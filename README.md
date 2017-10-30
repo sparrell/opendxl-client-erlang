@@ -22,7 +22,7 @@ To start using the OpenDXL Erlang Client Library:
 Review the [OpenWeatherMap Service Example](https://github.com/waymirec/opendxl-client-erlang/tree/master/examples/service_wrapper) for a complete example on how to use the OpenDXL Erlang client including
 a sample rebar.config. 
 
-````
+```
 C02VCDMNHTD6:service_wrapper cwaymire$ pwd
 /source/opendxl/opendxl-client-erlang/examples/service_wrapper
 C02VCDMNHTD6:service_wrapper cwaymire$ rebar3 compile
