@@ -85,9 +85,10 @@ dxlc:subscribe_notification(Client, Category, Callback, Opts)
 * {M,F,A} - standard erlang:apply call (e.g. M:F([Data | A]))
 
 <i>Opts</i> is a list of tagged-tuple options:
-* single_use - if set to true this callback will deregister after it's first use.
-* filter - specify a function that will be used to filter matches for this callback
-* timeout - specify a timeout (in ms) before deregistering this callback. Also allows for providing a callback to execute if a timeout occurs (e.g. {timeout, {5000, timeout_func/1})
+* single_use - if set to true this callback will deregister after it's first use. (e.g. {single_use, true})
+* filter - specify a function that will be used to filter matches for this callback (e.g. {filter, fun filter_func/1})
+* timeout - specify a timeout (in ms) before deregistering this callback. Also allows for providing a callback to 
+execute if a timeout occurs (e.g. {timeout, 5000} or {timeout, {5000, fun timeout_func/1})
 
 
 <b>Notification Categories</b>
@@ -316,10 +317,10 @@ dxlc:subscribe_notifiation(Client, service, self(), [{filter, Filter}]),
 ## Build
 $ rebar3 compile
 
-```
 
 ## Connect to Broker
 
+```
 Connect to DXL Broker:
 
 ```erlang
