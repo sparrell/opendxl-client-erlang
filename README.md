@@ -15,6 +15,8 @@ See the [Erlang Client SDK Documentation](https://waymirec.github.io/opendxl-cli
 ## Usage
 
 ### events
+The DXL fabric allows for event-based communication, typically referred to as “publish/subscribe” model wherein clients register interest by subscribing to a particular topic and publishers periodically send events to that topic. The event is delivered by the DXL fabric to all of the currently subscribed clients for the topic. Therefore, a single event sent can reach multiple clients (one-to-many). It is important to note that in this model the client passively receives events when they are sent by a publisher.
+
 ```erlang
 %% load config from file
 {ok, Config} = dxl_client_conf:read_from_file(<<"/path/to/config">>),
@@ -34,6 +36,7 @@ dxlc:stop(Client).
 ```
 
 ### services
+The DXL fabric allows for “services” to be registered and exposed that respond to requests sent by invoking clients. This communication is point-to-point (one-to-one), meaning the communication is solely between an invoking client and the service that is being invoked. It is important to note that in this model the client actively invokes the service by sending it requests.
 ```erlang
 %% load config from file
 {ok, Config} = dxl_client_conf:read_from_file(<<"/path/to/config">>),
@@ -60,6 +63,8 @@ dxl_util:log_dxlmessage("Got Response", Response),
 dxlc:unregister_service(Client, ServiceId),
 ok.
 ```
+
+### Notifications
 
 ## Build
 ```
