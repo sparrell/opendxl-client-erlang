@@ -138,12 +138,14 @@ result of the request will not be known. If the result is needed then
 either use the deregister_service_async function that accepts a callback   
 or manually subscribe to service notifications.</p>
   
+   <pre>
    e.g. Filter = fun({_, ServiceId, _}) -&gt; ServiceId =:= Id end,
         Callback = fun({service_unregistered, Id, Type}) -&gt; do_something;
                       ({service_unregistration_failed, Id, Type, Reason}) -&gt; uh_oh
                    end,
         Opts = [{filter, Filter}, {one_time_only, true}],
-        {ok, NotifId} = dxlc:subscribe_notification(Pid, service, Callback, Opts)</p>
+        {ok, NotifId} = dxlc:subscribe_notification(Pid, service, Callback, Opts)
+   </pre></p>
 
 <h3 class="function"><a name="deregister_service_async-4">deregister_service_async/4</a></h3>
 <div class="spec">
