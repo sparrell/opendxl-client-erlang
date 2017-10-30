@@ -415,16 +415,16 @@ process_message({Topic, Message, Client}, MyPid) ->
 ```erlang
 %% Filter messages by topic
 Filter = fun({Topic, _Message, _Client}) -> Topic =:= <<"/my/topic">> end,
-dxlc:subscribe_notifiation(Client, message_in, self(), [{filter, Filter}]),
+dxlc:subscribe_notification(Client, message_in, self(), [{filter, Filter}]),
 ```
 
 ```erlang
 %% Filter messages by topic using helper
 Filter = dxl_util:create_topic_filter(<<"/my/topic">>),
-dxlc:subscribe_notifiation(Client, message_in, self(), [{filter, Filter}]),
+dxlc:subscribe_notification(Client, message_in, self(), [{filter, Filter}]),
 
 Filter = dxl_util:create_topic_filter(event, <<"/my/topic">>),
-dxlc:subscribe_notifiation(Client, message_in, self(), [{filter, Filter}]),
+dxlc:subscribe_notification(Client, message_in, self(), [{filter, Filter}]),
 ```
 
 ```erlang
@@ -432,7 +432,7 @@ dxlc:subscribe_notifiation(Client, message_in, self(), [{filter, Filter}]),
 Filter = fun({_Topic, #dxlmessag{client_ids=ClientIds}, _Client}) -> 
                 lists:member(<<"target_client_id">>, ClientIds)
          end,
-dxlc:subscribe_notifiation(Client, message_in, self(), [{filter, Filter}]),
+dxlc:subscribe_notification(Client, message_in, self(), [{filter, Filter}]),
 ```
 
 ```erlang
@@ -441,7 +441,7 @@ Filter = fun(Data) ->
             (element(1, Data) =:= service_registered) or
             (element(1, Data) =:= service_registration_failed)
          end,
-dxlc:subscribe_notifiation(Client, service, self(), [{filter, Filter}]),
+dxlc:subscribe_notification(Client, service, self(), [{filter, Filter}]),
 ```
 
 ## Bugs and Feedback
