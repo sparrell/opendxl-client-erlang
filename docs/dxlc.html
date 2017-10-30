@@ -163,55 +163,57 @@ interval before abandoning the attempt.</p>
 </div><p><p>   
 Returns all of the services registered on the broker.</p>
   
-   <p>e.g.      
-{        
-"services": {          
-"1b369149-ed6e-455b-a8cf-2bbcc0e97e75": {            
-"brokerGuid": "{bba830c4-826d-11e7-1280-08002731ae47}",            
-"certificates": [</p>
+   <pre>
+   e.g.
+      {
+        "services": {
+          "1b369149-ed6e-455b-a8cf-2bbcc0e97e75": {
+            "brokerGuid": "{bba830c4-826d-11e7-1280-08002731ae47}",
+            "certificates": [
   
-            <p>],            
-"clientGuid": "erl_dxlclient1",            
-"local": true,            
-"managed": true,            
-"metaData": {</p>
+            ],
+            "clientGuid": "erl_dxlclient1",
+            "local": true,
+            "managed": true,
+            "metaData": {
   
-            <p>},            
-"registrationTime": 1509123717,            
-"requestChannels": [              
-"/test/topic/foo"            
-],            
-"serviceGuid": "1b369149-ed6e-455b-a8cf-2bbcc0e97e75",            
-"serviceType": "foo",            
-"ttlMins": 60,            
-"unauthorizedChannels": [</p>
+            },
+            "registrationTime": 1509123717,
+            "requestChannels": [
+              "/test/topic/foo"
+            ],
+            "serviceGuid": "1b369149-ed6e-455b-a8cf-2bbcc0e97e75",
+            "serviceType": "foo",
+            "ttlMins": 60,
+            "unauthorizedChannels": [
   
-            <p>]          
-},          
-"dc1733fb-1178-48b9-8893-2056f413fae2": {            
-"brokerGuid": "{bba830c4-826d-11e7-1280-08002731ae47}",            
-"certificates": [</p>
+            ]
+          },
+          "dc1733fb-1178-48b9-8893-2056f413fae2": {
+            "brokerGuid": "{bba830c4-826d-11e7-1280-08002731ae47}",
+            "certificates": [
   
-            <p>],            
-"clientGuid": "erl_dxlclient1",            
-"local": true,            
-"managed": true,            
-"metaData": {</p>
+            ],
+            "clientGuid": "erl_dxlclient1",
+            "local": true,
+            "managed": true,
+            "metaData": {
   
-            <p>},            
-"registrationTime": 1509123720,            
-"requestChannels": [              
-"/test/topic/bar"            
-],            
-"serviceGuid": "dc1733fb-1178-48b9-8893-2056f413fae2",            
-"serviceType": "bar",            
-"ttlMins": 60,            
-"unauthorizedChannels": [</p>
+            },
+            "registrationTime": 1509123720,
+            "requestChannels": [
+              "/test/topic/bar"
+            ],
+            "serviceGuid": "dc1733fb-1178-48b9-8893-2056f413fae2",
+            "serviceType": "bar",
+            "ttlMins": 60,
+            "unauthorizedChannels": [
   
             ]
           }
         }
-      }</p>
+      }
+   </pre></p>
 
 <h3 class="function"><a name="get_all_active_services-2">get_all_active_services/2</a></h3>
 <div class="spec">
@@ -295,10 +297,11 @@ interval before abandoning the attempt.</p>
 be passed to the provided Callback as a tuple tagged with either   
 'service_registered' or 'service_registration_failed'.</p>
   
-   <p>e.g. fun({service_registered, ServiceId, ServiceType}) -&gt; ok;           
-({service_registration_failed, ServiceId, ServiceType, Reason}) -&gt; ok        
-end.</p>
-  
+  <pre>
+   e.g. fun({service_registered, ServiceId, ServiceType}) -&gt; ok;
+           ({service_registration_failed, ServiceId, ServiceType, Reason}) -&gt; ok
+        end.
+  </pre>
    Returns {ok, ServiceId} on success, or {error, Reason} on failure.</p>
 
 <h3 class="function"><a name="send_error-3">send_error/3</a></h3>
@@ -433,9 +436,11 @@ Subscribe to the provided DXL topic without registering a callback handler.
 In order to receive messages on this topic a handler will need to be   
 registered with the notification system on the message_in category.</p>
   
+  <pre>
    e.g. Filter = dxl_util:create_topic_filter(TopicToSubTo),
         Callback = fun({Topic, Message, Client}) -&gt; process_message(Message) end,
-        {ok, NotifId} = dxlc:subscribe_notification(Pid, message_in, Callback,</p>
+        {ok, NotifId} = dxlc:subscribe_notification(Pid, message_in, Callback,
+   </pre></p>
 
 <h3 class="function"><a name="subscribe-3">subscribe/3</a></h3>
 <div class="spec">

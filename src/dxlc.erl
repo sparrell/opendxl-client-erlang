@@ -188,10 +188,11 @@ register_service_async(Pid, Service) ->
 %%% be passed to the provided Callback as a tuple tagged with either
 %%% 'service_registered' or 'service_registration_failed'.
 %%%
+%%%<pre>
 %%% e.g. fun({service_registered, ServiceId, ServiceType}) -> ok;
 %%%         ({service_registration_failed, ServiceId, ServiceType, Reason}) -> ok
 %%%      end.
-%%%
+%%%</pre>
 %%% Returns {ok, ServiceId} on success, or {error, Reason} on failure.
 %%% @end
 %%%----------------------------------------------------------------------------
@@ -272,9 +273,11 @@ deregister_service_async(Pid, Id, Callback, Timeout) ->
 %%% In order to receive messages on this topic a handler will need to be
 %%% registered with the notification system on the message_in category.
 %%%
+%%%<pre>
 %%% e.g. Filter = dxl_util:create_topic_filter(TopicToSubTo),
 %%%      Callback = fun({Topic, Message, Client}) -> process_message(Message) end,
 %%%      {ok, NotifId} = dxlc:subscribe_notification(Pid, message_in, Callback,
+%%% </pre>
 %%% @end
 %%%----------------------------------------------------------------------------
 subscribe(Pid, Topic) ->
@@ -571,6 +574,7 @@ unsubscribe_notification(Pid, NotificationId) ->
 %%% @doc
 %%% Returns all of the services registered on the broker.
 %%%
+%%% <pre>
 %%% e.g.
 %%%    {
 %%%      "services": {
@@ -620,6 +624,7 @@ unsubscribe_notification(Pid, NotificationId) ->
 %%%        }
 %%%      }
 %%%    }
+%%% </pre>
 %%% @end
 %%%----------------------------------------------------------------------------
 get_all_active_services(Pid) ->
