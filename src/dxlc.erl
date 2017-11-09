@@ -666,7 +666,7 @@ handle_call({subscribe, Topic, Callback}, _From, State) ->
     #state{dxl_conn = DxlConn, notif_man = N} = State,
     dxl_conn:subscribe(DxlConn, Topic),
     case Callback of
-        none -> {reply, ok, State};
+        undefined -> {reply, ok, State};
         _ ->
             Filter = dxl_util:create_topic_filter(Topic),
             {ok, Id} = dxl_notif_man:subscribe(N, message_in, Callback, [{filter, Filter}]),

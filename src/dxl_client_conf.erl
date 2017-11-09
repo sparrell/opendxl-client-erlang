@@ -26,7 +26,8 @@ read_from_file(Filename) ->
               {ssl, [
                   {cacertfile, BrokerCertChain},
                   {certfile, CertFile},
-                  {keyfile, PrivateKey}
+                  {keyfile, PrivateKey},
+                  {versions, [ "tlsv1.2" ]}
               ]},
               {reconnect, {ReconnDelayMin, ReconnDelayMax, ConnectRetries}}]};
         Error ->

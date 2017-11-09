@@ -91,7 +91,20 @@ message_is_a_reply(#dxlmessage{} = Message, #dxlmessage{} = Request) ->
     end.
 
 create_topic_filter(Topic) ->
-    fun({T, _, _}) -> Topic =:= T end.
+    Last = binary:part(Topic, byte_size(Topic), -1),
+    case Last =:= <<"#">> of
+        true ->
+            Pattern = binary:part(Topic, 0, byte_size(Topic)-1),
+            PatternLen = byte_size(Pattern),
+            fun({T, _, _}) ->
+                case binary:match(T, Pattern) of
+                    {0, PatternLen} -> true;
+                    _ -> false
+                end
+            end;
+        false ->
+            fun({T, _, _}) -> Topic =:= T end
+    end.
 
 create_topic_filter(TypeIn, TopicIn) ->
     fun({Topic, #dxlmessage{type = Type}, _}) when Type =:= TypeIn, Topic =:= TopicIn -> true;

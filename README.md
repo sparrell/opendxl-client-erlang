@@ -15,80 +15,26 @@ See the [Erlang Client SDK Documentation](https://waymirec.github.io/opendxl-cli
 
 ## Installation
 To start using the OpenDXL Erlang Client Library:
-* Download [Rebar3](https://www.rebar3.org/)
-* Modify the rebar.config and add opendxl-erlang-client to the deps tuple.
-* From your root source directory run <code>rebar3 compile</code>
+* Download and install [Erlang R17+](http://www.erlang.org/).
+* Download [Rebar3](https://www.rebar3.org/) and place it somewhere in your path.
+* Create new Rebar3 app by executing the command <b>rebar3 new app <appname></b> (e.g. "rebar3 new app foo") from a command prompt.
+  <br/>e.g.
+  ```erlang
+  C02VCDMNHTD6:~ cwaymire$ rebar3 new app foo
+  ===> Writing foo/src/foo_app.erl
+  ===> Writing foo/src/foo_sup.erl
+  ===> Writing foo/src/foo.app.src
+  ===> Writing foo/rebar.config
+  ===> Writing foo/.gitignore
+  ===> Writing foo/LICENSE
+  ===> Writing foo/README.md
+  ```
+* Modify the <b>rebar.config</b> file in the app root directory and add opendxl-erlang-client to the deps tuple.
+* Run <b>rebar3 compile</b> from a command prompt.
 
 Review the [OpenWeatherMap Service Example](https://github.com/waymirec/opendxl-client-erlang/tree/master/examples/service_wrapper) for a complete example on how to use the OpenDXL Erlang client including
 a sample rebar.config. 
 
-```
-C02VCDMNHTD6:service_wrapper cwaymire$ pwd
-/source/opendxl/opendxl-client-erlang/examples/service_wrapper
-C02VCDMNHTD6:service_wrapper cwaymire$ rebar3 compile
-===> Verifying dependencies...
-===> Fetching eini ({git,"https://github.com/erlcloud/eini.git",
-                                {branch,"master"}})
-===> Fetching emqttc ({git,"https://github.com/waymirec/emqttc.git",
-                                  {branch,"master"}})
-===> Fetching jiffy ({git,"https://github.com/davisp/jiffy.git",
-                                 {branch,"master"}})
-===> Fetching lager ({git,"https://github.com/erlang-lager/lager.git",
-                                 {tag,"3.5.1"}})
-===> Fetching msgpack ({git,"git://github.com/msgpack/msgpack-erlang.git",
-                                   {branch,"master"}})
-===> Fetching gen_logger ({git,"https://github.com/emqtt/gen_logger.git",
-                                      {branch,"master"}})
-===> Fetching goldrush ({pkg,<<"goldrush">>,<<"0.1.9">>})
-===> Downloaded package, caching at /Users/cwaymire/.cache/rebar3/hex/default/packages/goldrush-0.1.9.tar
-===> Skipping lager (from {git,"https://github.com/basho/lager.git",
-                                      {branch,"master"}}) as an app of the same name has already been fetched
-===> Compiling eini
-===> Compiling goldrush
-===> Compiling lager
-===> Compiling gen_logger
-===> Compiling msgpack
-===> Compiling jiffy
-Compiling c_src/decoder.c
-Compiling c_src/encoder.c
-Compiling c_src/jiffy.c
-Compiling c_src/utf8.c
-Compiling c_src/util.c
-Compiling c_src/doubles.cc
-Compiling c_src/objects.cc
-Compiling c_src/double-conversion/bignum-dtoa.cc
-Compiling c_src/double-conversion/bignum.cc
-Compiling c_src/double-conversion/cached-powers.cc
-Compiling c_src/double-conversion/diy-fp.cc
-Compiling c_src/double-conversion/double-conversion.cc
-Compiling c_src/double-conversion/fast-dtoa.cc
-Compiling c_src/double-conversion/fixed-dtoa.cc
-Compiling c_src/double-conversion/strtod.cc
-===> Compiling emqttc
-_build/default/lib/emqttc/src/emqttc_socket.erl:205: Warning: gen_fsm:send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-_build/default/lib/emqttc/src/emqttc_socket.erl:216: Warning: gen_fsm:send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-_build/default/lib/emqttc/src/emqttc_socket.erl:234: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-_build/default/lib/emqttc/src/emqttc_socket.erl:243: Warning: gen_fsm:send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-
-_build/default/lib/emqttc/src/emqttc.erl:173: Warning: gen_fsm:start_link/3 is deprecated and will be removed in a future release; use gen_statem:start_link/3
-_build/default/lib/emqttc/src/emqttc.erl:184: Warning: gen_fsm:start_link/4 is deprecated and will be removed in a future release; use gen_statem:start_link/4
-_build/default/lib/emqttc/src/emqttc.erl:192: Warning: gen_fsm:sync_send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:call/2
-_build/default/lib/emqttc/src/emqttc.erl:245: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-_build/default/lib/emqttc/src/emqttc.erl:253: Warning: gen_fsm:sync_send_event/2 is deprecated and will be removed in a future release; use gen_statem:call/2
-_build/default/lib/emqttc/src/emqttc.erl:326: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-_build/default/lib/emqttc/src/emqttc.erl:329: Warning: gen_fsm:sync_send_event/3 is deprecated and will be removed in a future release; use gen_statem:call/3
-_build/default/lib/emqttc/src/emqttc.erl:341: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-_build/default/lib/emqttc/src/emqttc.erl:349: Warning: gen_fsm:sync_send_event/3 is deprecated and will be removed in a future release; use gen_statem:call/3
-_build/default/lib/emqttc/src/emqttc.erl:357: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-_build/default/lib/emqttc/src/emqttc.erl:365: Warning: gen_fsm:sync_send_all_state_event/2 is deprecated and will be removed in a future release; use gen_statem:call/2
-_build/default/lib/emqttc/src/emqttc.erl:489: Warning: gen_fsm:cancel_timer/1 is deprecated and will be removed in a future release; use erlang:cancel_timer/1
-_build/default/lib/emqttc/src/emqttc.erl:506: Warning: gen_fsm:send_event/2 is deprecated and will be removed in a future release; use gen_statem:cast/2
-_build/default/lib/emqttc/src/emqttc.erl:771: Warning: gen_fsm:cancel_timer/1 is deprecated and will be removed in a future release; use erlang:cancel_timer/1
-_build/default/lib/emqttc/src/emqttc.erl:979: Warning: gen_fsm:start_timer/2 is deprecated and will be removed in a future release; use erlang:start_timer/3
-_build/default/lib/emqttc/src/emqttc.erl:1069: Warning: gen_fsm:reply/2 is deprecated and will be removed in a future release; use gen_statem:reply/2
-_build/default/lib/emqttc/src/emqttc.erl:1082: Warning: gen_fsm:reply/2 is deprecated and will be removed in a future release; use gen_statem:reply/2
-_build/default/lib/emqttc/src/emqttc.erl:1093: Warning: gen_fsm:reply/2 is deprecated and will be removed in a future release; use gen_statem:reply/2
-```
 
 ## Connect to Broker
 

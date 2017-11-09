@@ -1,9 +1,9 @@
-{application, dxlclient,
+{application, opendxlclient,
  [{description, "An OTP application"},
   {id, "dxlclient"},
   {vsn, "0.1.0"},
   {registered, []},
-  {mod, { dxlclient_app, []}},
+  {mod, {opendxlclient_app, []}},
   {applications,
    [kernel,
     stdlib

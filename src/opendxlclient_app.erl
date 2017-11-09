@@ -1,4 +1,4 @@
--module(dxlclient_app).
+-module(opendxlclient_app).
 
 -behaviour(application).
 
