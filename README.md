@@ -17,7 +17,7 @@ See the [Erlang Client SDK Documentation](https://waymirec.github.io/opendxl-cli
 To start using the OpenDXL Erlang Client Library:
 * Download and install [Erlang R17+](http://www.erlang.org/).
 * Download [Rebar3](https://www.rebar3.org/) and place it somewhere in your path.
-* Create new Rebar3 app by executing the command <b>rebar3 new app <appname></b> (e.g. "rebar3 new app foo") from a command prompt.
+* Create new Rebar3 app by executing the command <b>rebar3 new app &lt;appname&gt;</b> (e.g. "rebar3 new app foo") from a command prompt.
   <br/>e.g.
   ```erlang
   C02VCDMNHTD6:~ cwaymire$ rebar3 new app foo
